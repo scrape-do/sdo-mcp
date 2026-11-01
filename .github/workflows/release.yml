@@ -1,0 +1,216 @@
+# SPDX-License-Identifier: Apache-2.0
+# Release on a version tag, in four jobs:
+#   build   — read-only: tests, builds the archives, checksums and SBOMs with
+#             GoReleaser, and uploads them as a workflow artifact.
+#   smoke   — unpacks the archive for each supported platform on a runner of
+#             that platform and runs the binary, so every published file is
+#             known to start where it is meant to run.
+#   publish — gated by the `release` environment (required reviewers) and only
+#             for tags on commits contained in main: signs checksums.txt with
+#             cosign (keyless). Nothing is rebuilt after approval.
+#   github-release — creates the GitHub Release from the signed files. It runs
+#             on the org's self-hosted runners: the org's IP allow list rejects
+#             GitHub API calls from GitHub-hosted runners. It checks out and
+#             runs no repository code.
+#
+# Two channels, chosen by the tag (trunk-based: every tag is on main):
+#   vX.Y.Z-rc.N -> GitHub pre-release (environment `prerelease`)
+#   vX.Y.Z      -> GitHub release      (environment `release`)
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions: {}
+
+jobs:
+  build:
+    # Forks and mirrors never publish.
+    if: github.repository_owner == 'scrape-do'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      channel: ${{ steps.channel.outputs.channel }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0 # GoReleaser reads the previous tag
+          persist-credentials: false
+      - name: Pick the channel from the tag
+        id: channel
+        run: |
+          if [[ "$GITHUB_REF_NAME" =~ ^v[0-9]+\.[0-9]+\.[0-9]+-rc\.[0-9]+$ ]]; then
+            echo "channel=test" >> "$GITHUB_OUTPUT"
+          elif [[ "$GITHUB_REF_NAME" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "channel=live" >> "$GITHUB_OUTPUT"
+          else
+            echo "::error::$GITHUB_REF_NAME is neither vX.Y.Z nor vX.Y.Z-rc.N" >&2
+            exit 1
+          fi
+      - name: Check the tag matches the server version
+        run: |
+          want="v$(sed -n 's/^const Version = "\(.*\)"$/\1/p' internal/version/version.go)"
+          if [ "$GITHUB_REF_NAME" != "$want" ]; then
+            echo "::error::tag $GITHUB_REF_NAME does not match internal/version.Version ($want)" >&2
+            exit 1
+          fi
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          # The newest patch of the current Go release, so the binaries carry
+          # every standard-library fix; a new minor comes only by a reviewed commit.
+          go-version: "1.27.x"
+          check-latest: true
+          cache: ${{ false }} # a release build never restores a cache another run wrote
+      - run: go test -race ./...
+      - uses: anchore/sbom-action/download-syft@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c # v0.24.3
+      - uses: goreleaser/goreleaser-action@a4f02ab5355a589de60d917a659ce617ed19b3de # v7.3.0
+        with:
+          distribution: goreleaser
+          version: v2.7.0 # exact: the release toolchain changes only by a reviewed commit
+          args: release --clean --skip=publish
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: dist
+          path: |
+            dist/*.tar.gz
+            dist/*.zip
+            dist/*.sbom.json
+            dist/checksums.txt
+          if-no-files-found: error
+          retention-days: 7
+
+  # Every archive is unpacked on a runner of its platform and the binary is
+  # run: `sdo-mcp version` must print the tag's version and `sdo-mcp serve`
+  # must answer an MCP initialize request over stdio. The arm64 Linux and the
+  # amd64/arm64 Windows legs run on the native GitHub-hosted runners for those
+  # platforms; macOS covers both architectures natively (arm64) and through
+  # Rosetta (amd64).
+  smoke:
+    needs: build
+    runs-on: ${{ matrix.os }}
+    permissions: {}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: ubuntu-latest, archive: linux_amd64 }
+          - { os: ubuntu-24.04-arm, archive: linux_arm64 }
+          - { os: macos-latest, archive: darwin_arm64 }
+          - { os: macos-latest, archive: darwin_amd64 }
+          - { os: windows-latest, archive: windows_amd64 }
+          - { os: windows-11-arm, archive: windows_arm64 }
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: dist
+          path: dist
+      - name: Unpack the archive for this platform and run the binary
+        shell: bash # also on Windows: Git Bash ships with the runner image
+        env:
+          ARCHIVE: ${{ matrix.archive }}
+        run: |
+          set -euo pipefail
+          version="${GITHUB_REF_NAME#v}"
+          cd dist
+          case "$ARCHIVE" in
+            windows_*)
+              unzip -q "sdo-mcp_${version}_${ARCHIVE}.zip" -d unpacked
+              bin=unpacked/sdo-mcp.exe ;;
+            *)
+              mkdir unpacked && tar -xzf "sdo-mcp_${version}_${ARCHIVE}.tar.gz" -C unpacked
+              bin=unpacked/sdo-mcp ;;
+          esac
+          for f in LICENSE NOTICE README.md CHANGELOG.md THIRD_PARTY_LICENSES.txt; do
+            test -s "unpacked/$f" || { echo "::error::$ARCHIVE: $f is missing from the archive" >&2; exit 1; }
+          done
+          got="$("$bin" version)"
+          if [ "$got" != "$version" ]; then
+            echo "::error::$ARCHIVE: 'sdo-mcp version' printed '$got', want '$version'" >&2
+            exit 1
+          fi
+          # One initialize request over stdio, then EOF: the reply must name the server.
+          reply="$(printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"smoke","version":"0"}}}' \
+            | SDO_TOKEN=smoke-test-token "$bin" serve)"
+          case "$reply" in
+            *'"serverInfo"'*'"sdo-mcp"'*) echo "$ARCHIVE: ok" ;;
+            *) echo "::error::$ARCHIVE: unexpected initialize reply: $reply" >&2; exit 1 ;;
+          esac
+
+  publish:
+    needs: [build, smoke]
+    runs-on: ubuntu-latest
+    # Manual approval gate: `prerelease` for release candidates, `release` for finals.
+    environment: ${{ needs.build.outputs.channel == 'test' && 'prerelease' || 'release' }}
+    permissions:
+      contents: read
+      id-token: write # cosign keyless signing (Sigstore OIDC)
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0 # all branches, for the main-ancestry check
+          persist-credentials: false
+      - name: Refuse tags that are not on main
+        run: |
+          if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
+            echo "::error::$GITHUB_REF_NAME ($GITHUB_SHA) is not on main; refusing to publish" >&2
+            exit 1
+          fi
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: dist
+          path: dist
+      - name: Verify the built files against checksums.txt
+        working-directory: dist
+        run: sha256sum --ignore-missing --strict -c checksums.txt
+      - uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+      - name: Sign checksums.txt (cosign keyless)
+        working-directory: dist
+        run: cosign sign-blob --yes --bundle checksums.txt.cosign.bundle checksums.txt
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: dist-signed
+          path: dist/
+          if-no-files-found: error
+
+  github-release:
+    needs: [build, publish]
+    runs-on: self-hosted
+    permissions:
+      contents: write # create the GitHub Release
+    steps:
+      # The persistent runners may still hold root-owned files that an older,
+      # container-based job left in this workspace; reclaim them first.
+      - name: Reclaim the workspace
+        working-directory: ${{ github.workspace }}
+        run: docker run --rm -v "$PWD:/w" golang:1.27 chown -R "$(id -u):$(id -g)" /w
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: dist-signed
+          path: dist
+      # The self-hosted runners do not ship the GitHub CLI: install a pinned,
+      # checksum-verified release.
+      - name: Install gh
+        env:
+          GH_VERSION: 2.102.0
+          GH_SHA256: bb766f710eef8ede859c18578c72c327597cd4c8a85b06001b1f3843c6019386
+        run: |
+          set -euo pipefail
+          curl -sSfL -o "$RUNNER_TEMP/gh.tar.gz" \
+            "https://github.com/cli/cli/releases/download/v${GH_VERSION}/gh_${GH_VERSION}_linux_amd64.tar.gz"
+          echo "${GH_SHA256}  $RUNNER_TEMP/gh.tar.gz" | sha256sum -c -
+          tar -xzf "$RUNNER_TEMP/gh.tar.gz" -C "$RUNNER_TEMP"
+          echo "$RUNNER_TEMP/gh_${GH_VERSION}_linux_amd64/bin" >> "$GITHUB_PATH"
+      - name: Create the GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CHANNEL: ${{ needs.build.outputs.channel }}
+        run: |
+          prerelease=()
+          if [ "$CHANNEL" = test ]; then prerelease=(--prerelease); fi
+          gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --verify-tag "${prerelease[@]}" \
+            --title "$GITHUB_REF_NAME" --notes "See CHANGELOG.md for the changes in this release." \
+            dist/*

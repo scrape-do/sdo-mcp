@@ -1,0 +1,49 @@
+# SPDX-License-Identifier: Apache-2.0
+# Built by .github/workflows/release.yml with `release --skip=publish`: the
+# build job produces these files, and the approved publish job signs
+# checksums.txt with cosign and uploads everything to the GitHub Release.
+#
+# Files, for version X.Y.Z (the tag without its "v"):
+#   sdo-mcp_X.Y.Z_<os>_<arch>.tar.gz   linux and darwin, amd64 and arm64
+#   sdo-mcp_X.Y.Z_windows_<arch>.zip   windows, amd64 and arm64
+#   <archive>.sbom.json                an SPDX SBOM per archive
+#   checksums.txt                      SHA-256 of every file above
+# Each archive holds the sdo-mcp binary (sdo-mcp.exe on Windows), LICENSE,
+# NOTICE, README.md, CHANGELOG.md and THIRD_PARTY_LICENSES.txt.
+version: 2
+# Pinned: without it the name comes from the Git remote or, under a go.work,
+# from whichever module `go list -m` prints first.
+project_name: sdo-mcp
+before:
+  hooks:
+    # License and notice texts of everything linked into the binary, from the
+    # module cache (no network).
+    - go run ./tools/thirdparty -o THIRD_PARTY_LICENSES.txt ./cmd/sdo-mcp
+builds:
+  - id: sdo-mcp
+    main: ./cmd/sdo-mcp
+    binary: sdo-mcp
+    env: [CGO_ENABLED=0]
+    flags: [-trimpath]
+    ldflags: ["-s -w"]
+    mod_timestamp: "{{ .CommitTimestamp }}" # reproducible: same commit, same bytes
+    goos: [linux, darwin, windows]
+    goarch: [amd64, arm64]
+archives:
+  - formats: [tar.gz]
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+    # Listed explicitly: the default set (LICENSE*, README*, CHANGELOG*)
+    # leaves out NOTICE and the third-party license texts.
+    files:
+      - LICENSE
+      - NOTICE
+      - README.md
+      - CHANGELOG.md
+      - THIRD_PARTY_LICENSES.txt
+checksum:
+  name_template: "checksums.txt"
+# One SPDX SBOM (syft) per archive, published next to it.
+sboms:
+  - artifacts: archive
