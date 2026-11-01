@@ -183,10 +183,11 @@ jobs:
       contents: write # create the GitHub Release
     steps:
       # The persistent runners may still hold root-owned files that an older,
-      # container-based job left in this workspace; reclaim them first.
+      # container-based job left in this workspace or in the runner's temp
+      # directory (CodeQL writes its PR diff range there); reclaim both.
       - name: Reclaim the workspace
         working-directory: ${{ github.workspace }}
-        run: docker run --rm -v "$PWD:/w" golang:1.27 chown -R "$(id -u):$(id -g)" /w
+        run: docker run --rm -v "$PWD:/w" -v "$RUNNER_TEMP:/t" golang:1.27 chown -R "$(id -u):$(id -g)" /w /t
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: dist-signed
