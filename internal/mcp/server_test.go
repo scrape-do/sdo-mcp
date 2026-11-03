@@ -72,8 +72,15 @@ func TestNotificationReturnsNil(t *testing.T) {
 func TestToolsList(t *testing.T) {
 	resp := Handle(context.Background(), nil, req("tools/list", 2, nil))
 	tools := resp.Result.(map[string]any)["tools"].([]map[string]any)
-	if len(tools) != 2 || tools[0]["name"] != "scrape" || tools[1]["name"] != "scrape_plugin" {
-		t.Errorf("tools = %v", tools)
+	want := []string{"scrape", "scrape_plugin", "async_job_create", "async_plugin_job_create", "async_job_status",
+		"async_task_result", "async_jobs_list", "async_job_cancel", "async_account"}
+	if len(tools) != len(want) {
+		t.Fatalf("got %d tools, want %d", len(tools), len(want))
+	}
+	for i, name := range want {
+		if tools[i]["name"] != name {
+			t.Errorf("tools[%d] = %v, want %s", i, tools[i]["name"], name)
+		}
 	}
 }
 

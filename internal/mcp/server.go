@@ -49,6 +49,8 @@ type Scraper interface {
 	// PluginResult calls a plugin and returns its response with status and
 	// headers, so the tool can report the cost like scrape does.
 	PluginResult(ctx context.Context, route string, params map[string]any) (*sdo.Result, error)
+	// Jobs is the async (q.scrape.do) job API the async_* tools use.
+	Jobs() *sdo.AsyncJobs
 	// Redact masks the client's token and credential shapes; every tool
 	// result passes through it before it reaches the model.
 	Redact(text string) string

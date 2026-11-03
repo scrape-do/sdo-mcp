@@ -171,7 +171,7 @@ func credentialProperties(path string, schema map[string]any) []string {
 
 // No tools/list input schema, nested ones included, has a property named
 // like a credential. Every schema is also closed, so an argument it does not
-// list cannot be read, and every description says a call costs credits.
+// list cannot be read, and every description says whether a call costs credits.
 func TestToolSchemasCarryNoCredentialField(t *testing.T) {
 	resp := Handle(context.Background(), nil, req("tools/list", 1, nil))
 	b, _ := json.Marshal(resp.Result)
@@ -192,8 +192,8 @@ func TestToolSchemasCarryNoCredentialField(t *testing.T) {
 		if tool.InputSchema["additionalProperties"] != false {
 			t.Errorf("%s: the input schema is not closed (additionalProperties: false)", tool.Name)
 		}
-		if !strings.Contains(tool.Description, "spends Scrape.do credits") {
-			t.Errorf("%s: the description does not say that a call spends credits", tool.Name)
+		if !strings.Contains(tool.Description, "spends Scrape.do credits") && !strings.HasSuffix(tool.Description, noCreditNote) {
+			t.Errorf("%s: the description does not say whether a call spends credits", tool.Name)
 		}
 	}
 	// The walk reaches nested schemas.

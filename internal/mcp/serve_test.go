@@ -43,6 +43,8 @@ func (f *slowScraper) PluginResult(context.Context, string, map[string]any) (*sd
 
 func (f *slowScraper) Redact(s string) string { return s }
 
+func (f *slowScraper) Jobs() *sdo.AsyncJobs { return nil }
+
 // session drives Serve over pipes, one line at a time.
 type session struct {
 	t    *testing.T

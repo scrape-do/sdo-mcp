@@ -5,6 +5,22 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- Async job tools on the `q.scrape.do` job API: `async_job_create`,
+  `async_plugin_job_create` (one task per params entry, up to 1000),
+  `async_job_status`, `async_task_result`, `async_jobs_list` (paged, filtered
+  by state and start time, sorted), `async_job_cancel` and `async_account`.
+  Job and task data from outside the server is fenced as untrusted; only the
+  two create tools spend credits, and every tool description says whether a
+  call does.
+
+### Changed
+
+- Built on `sdo-go` v0.2.0.
+
 ## [0.1.0] - 2026-11-01
 
 ### Added
