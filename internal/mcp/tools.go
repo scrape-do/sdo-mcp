@@ -231,6 +231,8 @@ func object(props map[string]any, required ...string) map[string]any {
 	return map[string]any{"type": "object", "properties": props, "required": required, "additionalProperties": false}
 }
 
+func init() { tools = append(tools, jobTools...) }
+
 func toolDefs() []map[string]any {
 	defs := make([]map[string]any, len(tools))
 	for i, t := range tools {

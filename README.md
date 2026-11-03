@@ -20,6 +20,21 @@ it previously shipped as `sdo mcp serve`.
   one comma-separated string (`"4,5"`), since the plugins read only the first
   of a repeated key; an array is refused. Google plugins take `gl` for the
   country, not `geoCode`.
+- Async jobs on `q.scrape.do`, for batches that should not block the model:
+  - `async_job_create` (`targets`, `options`) and `async_plugin_job_create`
+    (`plugin`, `params`: one object per task, up to 1000; `options`) submit a
+    job and return its id and task ids at once. These spend credits.
+  - `async_job_status` (`jobId`) and `async_jobs_list` (`page`, `pageSize`,
+    `status`, `startFrom`, `startTo`, `sort`; the reply says how many pages
+    there are) report jobs.
+  - `async_task_result` (`jobId`, `taskId`) returns a finished task's status
+    code and content; a task still running reports its state only.
+  - `async_job_cancel` (`jobId`) and `async_account` (async concurrency,
+    active jobs, credits) complete the set.
+  `options` takes the async API's own PascalCase job keys (`Super`, `GeoCode`,
+  `Render`, `WebhookURL`, ...). Everything a job or task carries from outside
+  (target URLs, error messages, content) is fenced as untrusted data. Only the
+  two create tools spend credits; every description says which.
 
 The `scrape` tool takes `url`, `render`, `super`, `geoCode`, `device`,
 `output`, `returnJson` (the page's network requests and content as JSON) and
@@ -27,7 +42,7 @@ The `scrape` tool takes `url`, `render`, `super`, `geoCode`, `device`,
 0–1000000, as a number or a string of digits). With a redirect the gateway did
 not follow, its result shows the target's `location`.
 
-There is no usage-statistics tool on purpose: the two tools fetch content for
+There is no usage-statistics tool on purpose: the scrape tools fetch content for
 the model, and account figures are an operator's concern (`sdo usage` in the
 CLI, or `Client.Usage` in the SDK). The `/info` endpoint also allows only 10
 calls a minute per IP, a budget a model in a loop would spend for the user's
