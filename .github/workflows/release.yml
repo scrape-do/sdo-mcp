@@ -188,10 +188,26 @@ jobs:
       - name: Reclaim the workspace
         working-directory: ${{ github.workspace }}
         run: docker run --rm -v "$PWD:/w" -v "$RUNNER_TEMP:/t" golang:1.27 chown -R "$(id -u):$(id -g)" /w /t
+      # A persistent runner keeps the workspace between runs: without this,
+      # the previous release's files are still in dist/ and get uploaded too.
+      - name: Start from an empty dist/
+        run: rm -rf dist
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: dist-signed
           path: dist
+      # Upload exactly the files checksums.txt covers, plus the two it cannot.
+      - name: Check dist/ holds only this release
+        run: |
+          set -euo pipefail
+          cd dist
+          expected=$( (awk '{print $2}' checksums.txt; echo checksums.txt; echo checksums.txt.cosign.bundle) | sort)
+          actual=$(ls -1 | sort)
+          if [ "$expected" != "$actual" ]; then
+            echo "::error::dist/ differs from checksums.txt:" >&2
+            diff <(echo "$expected") <(echo "$actual") >&2 || true
+            exit 1
+          fi
       # The self-hosted runners do not ship the GitHub CLI: install a pinned,
       # checksum-verified release.
       - name: Install gh
