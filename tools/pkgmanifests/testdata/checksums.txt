@@ -1,0 +1,12 @@
+5485c17cefefa5fee30d3715fcb4e1808c488dcffc40df8914cd6447cccc8c27  sdo-mcp_0.2.0_darwin_amd64.tar.gz
+da093ee0b5957cbd497b12ea62a3f56cc5e31e2c73b523e5fbcd3bf2363436ed  sdo-mcp_0.2.0_darwin_amd64.tar.gz.sbom.json
+49470be4018df5e5713ae8cc6899d10f1d6e11235f2cc2b206cd1935c41da8a8  sdo-mcp_0.2.0_darwin_arm64.tar.gz
+f645eefc4d65b976d23d997555d97c1ba728c2e103a7703bca569a7d6ae18f14  sdo-mcp_0.2.0_darwin_arm64.tar.gz.sbom.json
+6d082a72b302b874abe405978c269a2b71b59023b1d23a71f8af77d50cc2698a  sdo-mcp_0.2.0_linux_amd64.tar.gz
+eb94a4b4ce9184bb80c7453f7d03671cef97ea61fca027aa3616c294ac1c25d2  sdo-mcp_0.2.0_linux_amd64.tar.gz.sbom.json
+3fd4eebb0c601f90896b4d586227d2f337a182b47ab0848bc4d4557f3f8f2fac  sdo-mcp_0.2.0_linux_arm64.tar.gz
+60ec77ae1464580144724620f6aaed7dacf741465c71ce918fc70aaf95c569b3  sdo-mcp_0.2.0_linux_arm64.tar.gz.sbom.json
+efd5a0aaa5cccc335ad84f618cd3da2c686374b26bcac48a5e32aa3538c3cc31  sdo-mcp_0.2.0_windows_amd64.zip
+6684be7fba1ce49abcb6681fe914ca07469c9049ed630a7c59fcba8152ed8adf  sdo-mcp_0.2.0_windows_amd64.zip.sbom.json
+69bcd0f21fd2e71ee75c0974841b44033dfec72bb406dda716e19185ebd8f6ca  sdo-mcp_0.2.0_windows_arm64.zip
+5b108531ea0b003d25646e81aa8d14d5ae69a44b91aa24392b532cddfedf10e6  sdo-mcp_0.2.0_windows_arm64.zip.sbom.json
