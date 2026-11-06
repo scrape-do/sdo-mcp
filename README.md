@@ -60,7 +60,28 @@ fenced with nonce-delimited markers before it reaches the model.
 
 ## Install
 
-Download a prebuilt archive from the
+With [Homebrew](https://brew.sh) (macOS and Linux), from the
+[scrape-do/homebrew-tap](https://github.com/scrape-do/homebrew-tap) tap:
+
+```sh
+brew install scrape-do/tap/sdo-mcp
+brew upgrade sdo-mcp             # later, for a new release
+```
+
+With [Scoop](https://scoop.sh) (Windows), from the
+[scrape-do/scoop-bucket](https://github.com/scrape-do/scoop-bucket) bucket:
+
+```powershell
+scoop bucket add scrape-do https://github.com/scrape-do/scoop-bucket
+scoop install sdo-mcp
+scoop update sdo-mcp             # later, for a new release
+```
+
+Both carry final releases only (no release candidates) and install the same
+archives as the GitHub Releases page, checked against the release's signed
+`checksums.txt` (see [SECURITY.md](SECURITY.md#supply-chain-integrity)).
+
+Or download a prebuilt archive from the
 [GitHub Releases](https://github.com/scrape-do/sdo-mcp/releases) page. For
 version X.Y.Z there is `sdo-mcp_X.Y.Z_<os>_<arch>.tar.gz` for `linux` and
 `darwin` and `sdo-mcp_X.Y.Z_windows_<arch>.zip` for Windows, each for `amd64`

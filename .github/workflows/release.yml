@@ -1,10 +1,13 @@
 # SPDX-License-Identifier: Apache-2.0
-# Release on a version tag, in four jobs:
+# Release on a version tag, in six jobs:
 #   build   — read-only: tests, builds the archives, checksums and SBOMs with
-#             GoReleaser, and uploads them as a workflow artifact.
+#             GoReleaser, and uploads them as a workflow artifact; generates
+#             the Homebrew formula and Scoop manifest for this version from
+#             checksums.txt (tools/pkgmanifests) as a second artifact.
 #   smoke   — unpacks the archive for each supported platform on a runner of
 #             that platform and runs the binary, so every published file is
-#             known to start where it is meant to run.
+#             known to start where it is meant to run; lints the formula on
+#             macOS and parses the manifest on Windows.
 #   publish — gated by the `release` environment (required reviewers) and only
 #             for tags on commits contained in main: signs checksums.txt with
 #             cosign (keyless). Nothing is rebuilt after approval.
@@ -12,10 +15,20 @@
 #             on the org's self-hosted runners: the org's IP allow list rejects
 #             GitHub API calls from GitHub-hosted runners. It checks out and
 #             runs no repository code.
+#   package-managers — final releases only, after the GitHub Release exists:
+#             checks the formula and manifest against the signed checksums.txt
+#             and commits them to scrape-do/homebrew-tap and
+#             scrape-do/scoop-bucket through GitHub's API (GitHub-signed
+#             commits) with a GitHub App token limited to those two
+#             repositories. Self-hosted, for the same IP allow list; it runs no
+#             repository code.
+#   verify-install — installs the release with `brew` (macOS) and `scoop`
+#             (Windows) from the public tap and bucket, as a user would.
 #
 # Two channels, chosen by the tag (trunk-based: every tag is on main):
-#   vX.Y.Z-rc.N -> GitHub pre-release (environment `prerelease`)
-#   vX.Y.Z      -> GitHub release      (environment `release`)
+#   vX.Y.Z-rc.N -> GitHub pre-release (environment `prerelease`); never
+#                  published to Homebrew or Scoop
+#   vX.Y.Z      -> GitHub release      (environment `release`), Homebrew, Scoop
 name: release
 
 on:
@@ -82,6 +95,17 @@ jobs:
             dist/checksums.txt
           if-no-files-found: error
           retention-days: 7
+      # A separate artifact: github-release refuses a dist/ holding anything
+      # checksums.txt does not list. Made here, before approval and without
+      # any GitHub API access, so what gets published is what was reviewed.
+      - name: Generate the Homebrew formula and the Scoop manifest
+        run: go run ./tools/pkgmanifests -version "${GITHUB_REF_NAME#v}" -checksums dist/checksums.txt -out dist/pkgmanifests
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: pkgmanifests
+          path: dist/pkgmanifests/
+          if-no-files-found: error
+          retention-days: 7
 
   # Every archive is unpacked on a runner of its platform and the binary is
   # run: `sdo-mcp version` must print the tag's version and `sdo-mcp serve`
@@ -139,6 +163,35 @@ jobs:
             *'"serverInfo"'*'"sdo-mcp"'*) echo "$ARCHIVE: ok" ;;
             *) echo "::error::$ARCHIVE: unexpected initialize reply: $reply" >&2; exit 1 ;;
           esac
+      # The package-manager files are checked where their tools live: brew
+      # and ruby ship with the macOS image, PowerShell with the Windows one.
+      # Local checks only; installing from the tap and bucket is verify-install.
+      - if: runner.os == 'macOS' || matrix.archive == 'windows_amd64'
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: pkgmanifests
+          path: pkgmanifests
+      - name: Lint the Homebrew formula
+        if: runner.os == 'macOS'
+        env:
+          HOMEBREW_NO_AUTO_UPDATE: "1"
+        run: |
+          set -euo pipefail
+          ruby -c pkgmanifests/Formula/sdo-mcp.rb
+          # A directory: Homebrew 7 rejects a single formula file outside a tap.
+          brew style pkgmanifests/Formula/
+      - name: Parse the Scoop manifest
+        if: matrix.archive == 'windows_amd64'
+        shell: pwsh
+        run: |
+          $m = Get-Content -Raw pkgmanifests/bucket/sdo-mcp.json | ConvertFrom-Json
+          $want = $env:GITHUB_REF_NAME -replace '^v', ''
+          if ($m.version -ne $want) { throw "manifest version '$($m.version)', want '$want'" }
+          foreach ($arch in '64bit', 'arm64') {
+            if (-not $m.architecture.$arch.url -or $m.architecture.$arch.hash -notmatch '^[0-9a-f]{64}$') {
+              throw "manifest architecture $arch lacks a url or a sha256 hash"
+            }
+          }
 
   publish:
     needs: [build, smoke]
@@ -231,3 +284,197 @@ jobs:
           gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --verify-tag "${prerelease[@]}" \
             --title "$GITHUB_REF_NAME" --notes "See CHANGELOG.md for the changes in this release." \
             dist/*
+
+  # Final releases go to the Homebrew tap and the Scoop bucket; release
+  # candidates stay on GitHub. The commits are made with GitHub's GraphQL
+  # createCommitOnBranch, which GitHub signs (the org requires signed commits,
+  # so a bot's `git push` would be refused), with a token from a GitHub App
+  # installed on those two repositories only, minted for this job.
+  package-managers:
+    needs: [build, github-release]
+    if: needs.build.outputs.channel == 'live'
+    runs-on: self-hosted
+    permissions: {} # writes with the App's token, never with GITHUB_TOKEN
+    env:
+      PROJECT: sdo-mcp
+    steps:
+      - name: Reclaim the workspace
+        working-directory: ${{ github.workspace }}
+        run: docker run --rm -v "$PWD:/w" -v "$RUNNER_TEMP:/t" golang:1.27 chown -R "$(id -u):$(id -g)" /w /t
+      - name: Start from empty directories
+        run: rm -rf dist pkgmanifests
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: dist-signed
+          path: dist
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: pkgmanifests
+          path: pkgmanifests
+      # The files were made by repository code in the build job; before they
+      # reach users, check them here against the cosign-signed checksums.txt
+      # with nothing but bash: every download is this release's, and every
+      # hash is the one checksums.txt gives that file.
+      - name: Verify the formula and the manifest
+        run: |
+          set -euo pipefail
+          version="${GITHUB_REF_NAME#v}"
+          base="https://github.com/$GITHUB_REPOSITORY/releases/download/$GITHUB_REF_NAME/"
+          next="https://github.com/$GITHUB_REPOSITORY/releases/download/v\$version/" # Scoop's autoupdate template
+          formula="pkgmanifests/Formula/$PROJECT.rb"
+          manifest="pkgmanifests/bucket/$PROJECT.json"
+          fail() { echo "::error::$*" >&2; exit 1; }
+          # "<url> <sha256>" lines on stdin; $1 is how many there must be.
+          check_pairs() {
+            local want=$1 n=0 url hash name
+            while read -r url hash; do
+              case "$url" in "$base"*) ;; *) fail "$url is not a file of $GITHUB_REF_NAME" ;; esac
+              name="${url#"$base"}"
+              grep -qxF "$hash  $name" dist/checksums.txt || fail "$name: $hash is not its hash in checksums.txt"
+              n=$((n + 1))
+            done
+            [ "$n" -eq "$want" ] || fail "found $n url/hash pairs, want $want"
+          }
+          # Every URL in either file: this release's downloads, or one of the
+          # fixed links the generator writes.
+          while read -r url; do
+            case "$url" in
+              "$base"* | "$next"* | https://scrape.do | "https://github.com/$GITHUB_REPOSITORY") ;;
+              *) fail "unexpected URL $url" ;;
+            esac
+          done < <(grep -ohE '[a-z]+://[^"]*' "$formula" "$manifest")
+          # The formula: each url line is followed by its sha256 line.
+          awk '$1 == "url" { gsub(/"/, "", $2); u = $2 } $1 == "sha256" { gsub(/"/, "", $2); print u, $2; u = "" }' "$formula" | check_pairs 4
+          # The manifest: an architecture's "url" is followed by its "hash".
+          awk -F'"' '$2 == "url" { u = $4 } $2 == "hash" && NF > 4 { print u, $4; u = "" }' "$manifest" | check_pairs 2
+          grep -qxF "  \"version\": \"$version\"," "$manifest" || fail "the manifest's version is not $version"
+          [ "$(grep -c '"version"' "$manifest")" -eq 1 ] || fail "the manifest has more than one version"
+          echo "formula and manifest match checksums.txt of $GITHUB_REF_NAME"
+      # The self-hosted runners do not ship the GitHub CLI: install a pinned,
+      # checksum-verified release.
+      - name: Install gh
+        env:
+          GH_VERSION: 2.102.0
+          GH_SHA256: bb766f710eef8ede859c18578c72c327597cd4c8a85b06001b1f3843c6019386
+        run: |
+          set -euo pipefail
+          curl -sSfL -o "$RUNNER_TEMP/gh.tar.gz" \
+            "https://github.com/cli/cli/releases/download/v${GH_VERSION}/gh_${GH_VERSION}_linux_amd64.tar.gz"
+          echo "${GH_SHA256}  $RUNNER_TEMP/gh.tar.gz" | sha256sum -c -
+          tar -xzf "$RUNNER_TEMP/gh.tar.gz" -C "$RUNNER_TEMP"
+          echo "$RUNNER_TEMP/gh_${GH_VERSION}_linux_amd64/bin" >> "$GITHUB_PATH"
+      # Contents write on the two repositories, nothing else; the action
+      # revokes the token when the job ends.
+      - uses: actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349 # v2.2.2
+        id: app-token
+        with:
+          app-id: ${{ secrets.TAP_APP_ID }}
+          private-key: ${{ secrets.TAP_APP_PRIVATE_KEY }}
+          owner: scrape-do
+          repositories: homebrew-tap,scoop-bucket
+          permission-contents: write
+      - name: Commit to the tap and the bucket
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          set -euo pipefail
+          version="${GITHUB_REF_NAME#v}"
+          # publish <repository> <path in it> <local file>
+          publish() {
+            local repo=$1 path=$2 file=$3 want state head current attempt url
+            # The file's git blob id: equal to the one on main means a re-run
+            # of a release already published.
+            want=$({ printf 'blob %d\0' "$(stat -c %s "$file")"; cat "$file"; } | sha1sum | cut -d' ' -f1)
+            for attempt in 1 2 3; do
+              [ "$attempt" -eq 1 ] || sleep $((attempt * 5))
+              if ! state=$(gh api graphql -f owner=scrape-do -f name="$repo" -f expr="main:$path" \
+                -f query='query($owner: String!, $name: String!, $expr: String!) {
+                  repository(owner: $owner, name: $name) {
+                    ref(qualifiedName: "refs/heads/main") { target { oid } }
+                    object(expression: $expr) { oid }
+                  }
+                }' --jq '"\(.data.repository.ref.target.oid) \(.data.repository.object.oid // "none")"'); then
+                echo "::warning::scrape-do/$repo: reading main failed (attempt $attempt)"
+                continue
+              fi
+              read -r head current <<<"$state"
+              if [ "$current" = "$want" ]; then
+                echo "::notice::scrape-do/$repo: $path is already $PROJECT $version"
+                return 0
+              fi
+              # Only fixed names, the version and base64 go into the JSON.
+              printf '{"query":"%s","variables":{"input":{"branch":{"repositoryNameWithOwner":"scrape-do/%s","branchName":"main"},"message":{"headline":"%s %s"},"expectedHeadOid":"%s","fileChanges":{"additions":[{"path":"%s","contents":"%s"}]}}}}' \
+                'mutation($input: CreateCommitOnBranchInput!) { createCommitOnBranch(input: $input) { commit { url } } }' \
+                "$repo" "$PROJECT" "$version" "$head" "$path" "$(base64 -w0 "$file")" >"$RUNNER_TEMP/commit.json"
+              # A stale expectedHeadOid (the other project's release committed
+              # in between) fails the mutation: read the head again and retry.
+              if url=$(gh api graphql --input "$RUNNER_TEMP/commit.json" --jq .data.createCommitOnBranch.commit.url); then
+                echo "scrape-do/$repo: $url"
+                echo "- scrape-do/$repo: $url" >>"$GITHUB_STEP_SUMMARY"
+                return 0
+              fi
+              echo "::warning::scrape-do/$repo: commit attempt $attempt failed"
+            done
+            echo "::error::scrape-do/$repo: could not commit $path" >&2
+            return 1
+          }
+          publish homebrew-tap "Formula/$PROJECT.rb" "pkgmanifests/Formula/$PROJECT.rb"
+          publish scoop-bucket "bucket/$PROJECT.json" "pkgmanifests/bucket/$PROJECT.json"
+
+  # Install the release as a user would, from the public tap and bucket,
+  # anonymously (no token, so the IP allow list does not apply). GitHub may
+  # serve the previous commit for a short while, hence the retries.
+  verify-install:
+    needs: [build, package-managers]
+    if: needs.build.outputs.channel == 'live'
+    runs-on: ${{ matrix.os }}
+    permissions: {}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest]
+    steps:
+      - name: Install with Homebrew
+        if: runner.os == 'macOS'
+        env:
+          HOMEBREW_NO_AUTO_UPDATE: "1"
+        run: |
+          set -euo pipefail
+          version="${GITHUB_REF_NAME#v}"
+          # The full name, as the README says: Homebrew 7 loads a formula from
+          # an untrusted tap only when it is named that way.
+          for attempt in 1 2 3 4 5; do
+            brew install scrape-do/tap/sdo-mcp
+            got="$(sdo-mcp version)"
+            [ "$got" != "$version" ] || break
+            [ "$attempt" -lt 5 ] || { echo "::error::'sdo-mcp version' printed '$got', want $version" >&2; exit 1; }
+            # An older tap commit: drop it and the install, fetch again.
+            sleep 30
+            brew uninstall sdo-mcp
+            brew untap scrape-do/tap
+          done
+          echo "brew: $got"
+          brew test scrape-do/tap/sdo-mcp
+      # Scoop's documented installer; -RunAsAdmin because the runner's user is
+      # an administrator.
+      - name: Install with Scoop
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $version = $env:GITHUB_REF_NAME -replace '^v', ''
+          Invoke-RestMethod get.scoop.sh -OutFile install.ps1
+          .\install.ps1 -RunAsAdmin
+          $env:PATH = "$env:USERPROFILE\scoop\shims;$env:PATH"
+          scoop bucket add scrape-do https://github.com/scrape-do/scoop-bucket
+          for ($attempt = 1; ; $attempt++) {
+            $m = Get-Content -Raw "$env:USERPROFILE\scoop\buckets\scrape-do\bucket\sdo-mcp.json" | ConvertFrom-Json
+            if ($m.version -eq $version) { break }
+            if ($attempt -ge 5) { throw "the bucket does not offer sdo-mcp $version (it has $($m.version))" }
+            Start-Sleep -Seconds 30
+            scoop update
+          }
+          scoop install scrape-do/sdo-mcp
+          $got = sdo-mcp version
+          if ("$got" -ne $version) { throw "'sdo-mcp version' printed '$got', want $version" }
+          Write-Output "scoop: $got"

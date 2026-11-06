@@ -208,7 +208,8 @@ version (`X.Y.Z` or `X.Y.Z-rc.N`), move the `Unreleased` CHANGELOG entries under
 it, and merge to `main`; the release workflow refuses a tag that does not match
 the constant or that is not on `main`.
 
-The release workflow (`.github/workflows/release.yml`) then runs four jobs:
+The release workflow (`.github/workflows/release.yml`) then runs four jobs,
+and two more for a final release:
 
 1. **build** (read-only): the race-enabled tests, then GoReleaser builds the
    archives for linux, darwin and windows on amd64 and arm64, an SPDX SBOM per
@@ -223,6 +224,40 @@ The release workflow (`.github/workflows/release.yml`) then runs four jobs:
    signs `checksums.txt` with cosign (keyless, recorded in the Rekor
    transparency log). Nothing is rebuilt after approval.
 4. **github-release**: creates the GitHub Release from the signed files.
+5. **package-managers** (final releases only, never a release candidate; on
+   the self-hosted runners, running no repository code): checks with plain
+   bash that every URL in the Homebrew formula and the Scoop manifest is this
+   release's and every hash is the one in the signed `checksums.txt`, then
+   commits `Formula/sdo-mcp.rb` to `scrape-do/homebrew-tap` and
+   `bucket/sdo-mcp.json` to `scrape-do/scoop-bucket` on `main` with GitHub's
+   GraphQL `createCommitOnBranch` (GitHub signs the commit; the org's ruleset
+   refuses unsigned ones), messages `sdo-mcp X.Y.Z`. A re-run that finds
+   identical files skips with a notice.
+6. **verify-install** (GitHub-hosted, no token): `brew install
+   scrape-do/tap/sdo-mcp` on macOS and `scoop install sdo-mcp` from the bucket
+   on Windows, each checking that `sdo-mcp version` prints the version.
+
+The build job makes the two files with `go run ./tools/pkgmanifests -version
+X.Y.Z -checksums dist/checksums.txt -out dist/pkgmanifests`, from
+`checksums.txt` alone and without any GitHub API access, and uploads them as the
+`pkgmanifests` artifact; smoke lints the formula (`brew style`, `ruby -c`) on
+macOS and parses the manifest on Windows. The tool's golden files in
+`tools/pkgmanifests/testdata/` are the real v0.2.0 files; after an intended
+change to the output, regenerate them with `go test ./tools/pkgmanifests
+-update` and review the diff.
+
+One-time setup for jobs 5 and 6, by an org owner:
+
+1. Create a GitHub App owned by the `scrape-do` organisation with no webhook
+   and one repository permission, **Contents: Read and write** (Metadata:
+   Read-only comes with it), and install it on `homebrew-tap` and
+   `scoop-bucket` only.
+2. Add two organisation secrets, available to `sdo-cli` and `sdo-mcp`:
+   `TAP_APP_ID` (the App's ID) and `TAP_APP_PRIVATE_KEY` (a private key
+   generated for it, the whole PEM).
+
+The job mints an installation token for those two repositories, limited to
+`contents: write`, which is revoked when the job ends.
 
 A Go module is also published by its tag — the module proxy fetches it on first
 request, and a published tag can never be moved or deleted (a bad one is

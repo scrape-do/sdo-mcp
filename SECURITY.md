@@ -123,6 +123,15 @@ Out of scope:
   sha256sum --ignore-missing -c checksums.txt
   ```
 
+- Final releases are also published to the Homebrew tap [`scrape-do/homebrew-tap`](https://github.com/scrape-do/homebrew-tap) (`Formula/sdo-mcp.rb`) and the Scoop bucket [`scrape-do/scoop-bucket`](https://github.com/scrape-do/scoop-bucket) (`bucket/sdo-mcp.json`); release candidates are not. The formula and the manifest build nothing and hold no binaries: they point at the release's archives on GitHub and pin each one by the SHA-256 that the cosign-signed `checksums.txt` gives it, which Homebrew and Scoop check before installing. The release build generates them from `checksums.txt` before approval; after the GitHub Release exists, a job that runs no repository code checks every URL and hash in them against `checksums.txt` again, then commits them through GitHub's API, with a short-lived token of a GitHub App that is installed on those two repositories only and may write their contents and nothing else. GitHub signs those commits, as the organisation requires for every commit.
+
+  Homebrew keeps the archive it installed in its cache, so a Homebrew user can still verify it against the signed release: download `checksums.txt` and `checksums.txt.cosign.bundle` of the installed version from the GitHub Release, run `cosign verify-blob` as above, then compare
+
+  ```bash
+  shasum -a 256 "$(brew --cache scrape-do/tap/sdo-mcp)"   # the archive Homebrew installed
+  grep '_darwin_arm64.tar.gz$' checksums.txt               # your platform's line: the same hash
+  ```
+
 - Sibling repositories under the same governance: `sdo-cli` (the CLI, which bundles this server), `sdo-sdk-python` (PyPI `sdo-sdk`), `sdo-sdk-js` (npm `@scrape-do/sdk`), and `sdo-go` (`github.com/scrape-do/sdo-go`).
 
 ## No-Telemetry Posture

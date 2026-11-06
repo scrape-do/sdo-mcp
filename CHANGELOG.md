@@ -5,6 +5,16 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- Homebrew and Scoop: `brew install scrape-do/tap/sdo-mcp` (macOS and Linux)
+  and `scoop bucket add scrape-do https://github.com/scrape-do/scoop-bucket`
+  then `scoop install sdo-mcp` (Windows). Each final release updates the
+  formula and the manifest, with the hashes from the release's signed
+  `checksums.txt`; release candidates stay on GitHub only.
+
 ## [0.2.0] - 2026-11-03
 
 ### Added
