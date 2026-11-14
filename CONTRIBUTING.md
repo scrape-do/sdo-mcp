@@ -248,13 +248,14 @@ change to the output, regenerate them with `go test ./tools/pkgmanifests
 
 One-time setup for jobs 5 and 6, by an org owner:
 
-1. Create a GitHub App owned by the `scrape-do` organisation with no webhook
-   and one repository permission, **Contents: Read and write** (Metadata:
-   Read-only comes with it), and install it on `homebrew-tap` and
-   `scoop-bucket` only.
+1. Create a GitHub App named `scrape-do-publisher`, owned by the `scrape-do`
+   organisation, with no webhook and one repository permission, **Contents:
+   Read and write** (Metadata: Read-only comes with it), and install it on
+   `homebrew-tap` and `scoop-bucket` only. Its commits appear as
+   `scrape-do-publisher[bot]`.
 2. Add two organisation secrets, available to `sdo-cli` and `sdo-mcp`:
-   `TAP_APP_ID` (the App's ID) and `TAP_APP_PRIVATE_KEY` (a private key
-   generated for it, the whole PEM).
+   `PUBLISHER_APP_ID` (the App's ID) and `PUBLISHER_APP_PRIVATE_KEY` (a
+   private key generated for it, the whole PEM).
 
 The job mints an installation token for those two repositories, limited to
 `contents: write`, which is revoked when the job ends.
