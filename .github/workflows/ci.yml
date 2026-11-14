@@ -5,8 +5,8 @@ on:
   push:
     branches: [main]
   pull_request:
-  # Weekly, so drift from sdo-cli's copy of internal/mcp surfaces even when this
-  # repository is quiet.
+  # Weekly, so drift from sdo-cli's copies of internal/mcp and internal/explain
+  # surfaces even when this repository is quiet.
   schedule:
     - cron: "41 5 * * 1"
 
@@ -110,11 +110,12 @@ jobs:
           tar -xzf "$RUNNER_TEMP/actionlint.tar.gz" -C "$RUNNER_TEMP" actionlint
           "$RUNNER_TEMP/actionlint" -color
 
-  # sdo-cli ships its own copy of internal/mcp for `sdo mcp serve`. The two are
-  # kept identical apart from the module path and branding.go, so a fix made in
-  # one repository is not silently missing from the other. A pull request only
-  # gets a warning (the matching sdo-cli change may still be in review); a push
-  # to main and the weekly run fail on drift.
+  # sdo-cli ships its own copies of internal/mcp and internal/explain for
+  # `sdo mcp serve`. They are kept identical apart from the module path and
+  # internal/mcp/branding.go, so a fix made in one repository is not silently
+  # missing from the other. A pull request only gets a warning (the matching
+  # sdo-cli change may still be in review); a push to main and the weekly run
+  # fail on drift.
   mcp-copy-drift:
     runs-on: ubuntu-latest
     permissions:
@@ -133,17 +134,26 @@ jobs:
           go-version: "1.27"
           check-latest: true
           cache: false
-      - name: Compare internal/mcp with sdo-cli's copy
+      - name: Compare internal/mcp and internal/explain with sdo-cli's copies
         run: |
-          copy="$(mktemp -d "$RUNNER_TEMP/mcp-copy.XXXXXX")"
-          cp -R sdo-cli/internal/mcp/. "$copy"
-          find "$copy" -name '*.go' -exec sed -i 's#github.com/scrape-do/sdo-cli/internal/#github.com/scrape-do/sdo-mcp/internal/#g' {} +
-          gofmt -w "$copy" # the renamed imports may sort differently
-          if diff -ru -x branding.go internal/mcp "$copy"; then
-            echo "internal/mcp matches sdo-cli's copy"
+          drift=()
+          for pkg in mcp explain; do
+            copy="$(mktemp -d "$RUNNER_TEMP/$pkg-copy.XXXXXX")"
+            cp -R "sdo-cli/internal/$pkg/." "$copy"
+            find "$copy" -name '*.go' -exec sed -i 's#github.com/scrape-do/sdo-cli/internal/#github.com/scrape-do/sdo-mcp/internal/#g' {} +
+            gofmt -w "$copy" # the renamed imports may sort differently
+            exclude=()
+            if [ "$pkg" = mcp ]; then exclude=(-x branding.go); fi
+            if diff -ru "${exclude[@]}" "internal/$pkg" "$copy"; then
+              echo "internal/$pkg matches sdo-cli's copy"
+            else
+              drift+=("internal/$pkg")
+            fi
+          done
+          if [ "${#drift[@]}" -eq 0 ]; then
             exit 0
           fi
-          msg="internal/mcp differs from sdo-cli's internal/mcp (beyond the module path and branding.go); mirror the change in the other repository"
+          msg="${drift[*]} differs from sdo-cli's copy (beyond the module path and internal/mcp/branding.go); mirror the change in the other repository"
           if [ "$GITHUB_EVENT_NAME" = pull_request ]; then
             echo "::warning::$msg"
           else
