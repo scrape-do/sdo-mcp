@@ -3,9 +3,6 @@
 # release age a week before it is proposed, so a compromised or broken release
 # is usually caught and pulled before it reaches this repository.
 version: 2
-
-# The gomod update can only succeed once the sdo-go version go.mod requires is
-# tagged.
 updates:
   - package-ecosystem: gomod
     directory: /
@@ -16,6 +13,10 @@ updates:
     groups:
       go-modules:
         patterns: ["*"]
+    commit-message:
+      prefix: chore
+      include: scope
+    labels: ["dependencies"]
   - package-ecosystem: github-actions
     directory: /
     schedule:
@@ -25,3 +26,7 @@ updates:
     groups:
       github-actions:
         patterns: ["*"]
+    commit-message:
+      prefix: chore
+      include: scope
+    labels: ["dependencies"]
