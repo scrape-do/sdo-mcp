@@ -1,13 +1,17 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 # sdo-mcp
 
-The standalone **Scrape.do MCP server**: a minimal [Model Context
-Protocol](https://modelcontextprotocol.io) server that exposes the Scrape.do
-scraping surface to an LLM. It speaks newline-framed JSON-RPC 2.0 over stdio and
-reuses the [sdo Go SDK](https://github.com/scrape-do/sdo-go) underneath.
+[![ci](https://github.com/scrape-do/sdo-mcp/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/scrape-do/sdo-mcp/actions/workflows/ci.yml) [![security](https://github.com/scrape-do/sdo-mcp/actions/workflows/security.yml/badge.svg?branch=main)](https://github.com/scrape-do/sdo-mcp/actions/workflows/security.yml) [![license](https://img.shields.io/github/license/scrape-do/sdo-mcp)](LICENSE) [![release](https://img.shields.io/github/v/release/scrape-do/sdo-mcp)](https://github.com/scrape-do/sdo-mcp/releases/latest)
 
-It was split out of the [sdo CLI](https://github.com/scrape-do/sdo-cli), where
-it previously shipped as `sdo mcp serve`.
+The official [Model Context Protocol](https://modelcontextprotocol.io) server
+for the [Scrape.do](https://scrape.do) web scraping API: a minimal server that
+exposes the Scrape.do scraping surface to an LLM. It speaks newline-framed
+JSON-RPC 2.0 over stdio and reuses the
+[sdo Go SDK](https://github.com/scrape-do/sdo-go) underneath. No telemetry, no
+update check, no UI: it contacts nothing but the Scrape.do API.
+
+The same server also ships inside the [sdo CLI](https://github.com/scrape-do/sdo-cli)
+as `sdo mcp serve`; this repository is the standalone binary.
 
 ## Tools
 
@@ -74,7 +78,7 @@ With [Scoop](https://scoop.sh) (Windows), from the
 
 ```powershell
 scoop bucket add scrape-do https://github.com/scrape-do/scoop-bucket
-scoop install sdo-mcp
+scoop install scrape-do/sdo-mcp
 scoop update sdo-mcp             # later, for a new release
 ```
 
@@ -88,11 +92,14 @@ version X.Y.Z there is `sdo-mcp_X.Y.Z_<os>_<arch>.tar.gz` for `linux` and
 `darwin` and `sdo-mcp_X.Y.Z_windows_<arch>.zip` for Windows, each for `amd64`
 and `arm64`. Every archive holds the `sdo-mcp` binary (`sdo-mcp.exe` on
 Windows), `LICENSE`, `NOTICE`, `README.md`, `CHANGELOG.md` and
-`THIRD_PARTY_LICENSES.txt`; every release also carries `checksums.txt` and a
-cosign signature for it (see [SECURITY.md](SECURITY.md) for how to verify a
-download). Unpack it and put `sdo-mcp` on your `PATH`.
+`THIRD_PARTY_LICENSES.txt`; every release also carries an SPDX SBOM per archive
+(`<archive>.sbom.json`), `checksums.txt` and a cosign signature for it (see
+[SECURITY.md](SECURITY.md) for how to verify a download). Unpack it and put
+`sdo-mcp` on your `PATH`. Releases are built by GitHub Actions, signed, and
+published only after a maintainer approves; see
+[CONTRIBUTING.md](CONTRIBUTING.md#releasing).
 
-With a Go toolchain (1.26 or newer) you can instead install from source:
+With a Go toolchain (Go 1.26.9 or newer) you can instead install from source:
 
 ```sh
 go install github.com/scrape-do/sdo-mcp/cmd/sdo-mcp@latest   # installs a binary named sdo-mcp
@@ -100,6 +107,42 @@ go install github.com/scrape-do/sdo-mcp/cmd/sdo-mcp@latest   # installs a binary
 
 or build a clone with `go build -o sdo-mcp ./cmd/sdo-mcp`. `sdo-mcp version`
 prints the installed version.
+
+## Quick start
+
+Add the server to your MCP client's configuration (Claude Desktop, Cursor,
+Claude Code, …), with your Scrape.do token in its environment:
+
+```json
+{
+  "mcpServers": {
+    "scrape-do": {
+      "command": "sdo-mcp",
+      "args": ["serve"],
+      "env": { "SDO_TOKEN": "<your token>" }
+    }
+  }
+}
+```
+
+To keep the token out of the client's configuration file, put it in a file
+only you can read (`chmod 600`) and pass the file instead:
+
+```json
+{
+  "mcpServers": {
+    "scrape-do": {
+      "command": "sdo-mcp",
+      "args": ["serve", "--token-file", "/path/to/scrape-do-token"]
+    }
+  }
+}
+```
+
+The server reads the token only from `--token`, `--token-file` or `SDO_TOKEN`,
+in that order (see [Token](#token)); it does not read the sdo CLI's
+`sdo auth login` config file. If `sdo-mcp` is not on the `PATH` the client
+starts it with, give `command` its full path.
 
 ## Running
 
@@ -146,6 +189,10 @@ prints an error and exits with code 3.
   larger response fails the call rather than being materialized. Defaults to
   33554432 (32 MiB). Useful to bound how much a model-driven fetch can pull.
 
-## License
+## Documentation, support and security
 
-Apache-2.0. See [LICENSE](LICENSE) and [NOTICE](NOTICE).
+- API documentation: https://scrape.do/documentation
+- Releases: [GitHub Releases](https://github.com/scrape-do/sdo-mcp/releases), the [Homebrew tap](https://github.com/scrape-do/homebrew-tap) and the [Scoop bucket](https://github.com/scrape-do/scoop-bucket).
+- Bugs and feature requests for this repository: [GitHub Issues](https://github.com/scrape-do/sdo-mcp/issues). Account, billing and API questions: support@scrape.do.
+- Security issues: see [SECURITY.md](SECURITY.md). Never post an API token in an issue.
+- [CONTRIBUTING.md](CONTRIBUTING.md) · [CHANGELOG.md](CHANGELOG.md) · [Apache-2.0](LICENSE) · [NOTICE](NOTICE)
