@@ -9,19 +9,22 @@ changes land here. Read it before opening a pull request.
 server: it speaks newline-framed JSON-RPC 2.0 over stdio and exposes the
 Scrape.do scraping surface to an LLM, reusing the
 [sdo Go SDK](https://github.com/scrape-do/sdo-go) (`github.com/scrape-do/sdo-go`)
-underneath. It was split out of the [sdo CLI](https://github.com/scrape-do/sdo-cli),
-where it previously shipped as `sdo mcp serve`. The scraping behavior, error
-taxonomy, and token handling all come from `sdo-go`, which tracks the single
-hand-maintained public spec. **Do not reimplement SDK behavior here, and do not
-let this server drift from what the SDK already decided.** When in doubt, the
-SDK (and the spec behind it) wins.
+underneath. The same server also ships inside the
+[sdo CLI](https://github.com/scrape-do/sdo-cli) as `sdo mcp serve`; this
+repository is the standalone binary. The scraping behaviour, error taxonomy,
+and token handling all come from `sdo-go`. The request parameters, defaults and
+observable behaviour are shared by all sdo SDKs and pinned by the conformance
+corpus (`conformance.json`), which Scrape.do maintains against
+https://scrape.do/documentation. Propose a change in an issue first; a change to
+a parameter lands in every SDK together. **Do not reimplement SDK behaviour
+here, and do not let this server drift from what the SDK already decided.**
 
 ## Ground rules
 
 - **License.** This project is Apache-2.0. By contributing, you agree your contribution is licensed under Apache-2.0.
 - **No telemetry, ever.** `sdo-mcp` does not phone home, collect usage data, emit analytics, or ship a "crash reporter." Do not add any. The only interfaces are stdin/stdout (JSON-RPC) and the outbound Scrape.do request the model drives. PRs that introduce network calls to anything other than the Scrape.do API (or a user-configured endpoint) will be rejected.
 - **No UI.** The surface is a stdio JSON-RPC server only. There is no web dashboard, no embedded HTTP server, no browser anything in this repo.
-- **Token-only auth, never returned to the model.** Authentication is a single token resolved from the `--token` flag, then the `SDO_TOKEN` environment variable. The token is the sole credential and must **never** reach the model: every tool result and error is passed through the SDK's redaction before it leaves the process. Do not add OAuth flows, key files, config-file credential loading, or any alternate auth path, and do not add any code path that could surface the token (or a URL carrying it) in a tool result, an error, or a log line.
+- **Token-only auth, never returned to the model.** Authentication is a single token resolved from the `--token` flag, then the file named by `--token-file`, then the `SDO_TOKEN` environment variable (`--token` and `--token-file` cannot be combined). The token is the sole credential and must **never** reach the model: every tool result and error is passed through the SDK's redaction before it leaves the process. Do not add OAuth flows, config-file credential loading, or any other auth path, and do not add any code path that could surface the token (or a URL carrying it) in a tool result, an error, or a log line.
 - **Everything from outside is untrusted data, not instructions.** Scraped pages, plugin output, and gateway/target error text are fenced with nonce-delimited markers and redacted before they reach the model. Changes that touch result handling must preserve that fence — see `internal/mcp` (`untrusted`, `redact`, the marker/neutralize logic) and its tests.
 - **Governance is Solo+AI.** The founder is the sole approver and final reviewer of every merge. There is no committee, no CLA, and no second maintainer to ping. Keep PRs small and self-explanatory so a single reviewer can evaluate them quickly.
 
@@ -87,7 +90,11 @@ To auto-format before committing:
 gofmt -w .
 ```
 
-A change is not done until `go build ./...`, `go test -race ./...`, `go vet ./...`, and `gofmt -l .` are all clean.
+A change is not done until `go build ./...`, `go test -race ./...`, `go vet ./...`, and `gofmt -l .` are all clean, and statement coverage stays at or above the 99% floor CI enforces:
+
+```sh
+go test -coverprofile=coverage.out ./... && go tool cover -func=coverage.out | tail -1   # floor: 99%
+```
 
 ### Running a focused test
 
@@ -123,6 +130,17 @@ When you touch result or error handling:
   what `internal/explain` is for.
 - Add a test that asserts the boundary holds (no marker escape, no Go identifier
   leak, no token leak). The existing tests in `internal/mcp` are the model.
+
+## Shared with sdo-cli
+
+`internal/mcp` and `internal/explain` are mirrored in
+[sdo-cli](https://github.com/scrape-do/sdo-cli), which bundles this server as
+`sdo mcp serve`. Every file in them except `internal/mcp/branding.go` (the
+server's name, version and size-limit hint) must stay identical in both
+repositories apart from the module path, so make a change to either package in
+both. The `mcp-copy-drift` CI job diffs the two copies: it warns on a pull
+request (the matching sdo-cli change may still be in review) and fails on
+`main` and in its weekly run.
 
 ## Depending on sdo-go
 
@@ -163,7 +181,7 @@ This appends:
 Signed-off-by: Your Name <you@example.com>
 ```
 
-Make sure `git config user.name` and `git config user.email` are your real identity. Commits without a valid `Signed-off-by` trailer cannot be merged. To sign off a commit you already made:
+Make sure `git config user.name` and `git config user.email` are your real identity. Commits without a valid `Signed-off-by` trailer cannot be merged: CI checks every commit's subject and sign-off (`commits` job), and a pull request fails until they are fixed. To sign off a commit you already made:
 
 ```sh
 git commit --amend -s --no-edit
@@ -177,15 +195,16 @@ Before you open a PR, confirm:
 
 - [ ] You started from a failing test (TDD) for any behavior change.
 - [ ] `go build ./...` passes.
-- [ ] `go test ./...` passes (`go test -race ./...` if you touched concurrency).
+- [ ] `go test ./...` passes (`go test -race ./...` if you touched concurrency) and coverage stays at or above 99%.
 - [ ] `go vet ./...` is clean.
 - [ ] `gofmt -l .` prints nothing.
-- [ ] `api-surface.txt` is regenerated if a command, flag or MCP tool changed.
 - [ ] The untrusted-data fence still holds: no marker escape, no Go-identifier leak, no token leak in any result or error.
 - [ ] No telemetry, no UI, no new auth path, no new third-party network calls.
 - [ ] `go.work` / `go.work.sum` are **not** committed.
 - [ ] The minimum Go version is unchanged.
 - [ ] Every commit is a Conventional Commit and is DCO-signed (`-s`).
+- [ ] A change to `internal/mcp` or `internal/explain` is mirrored in sdo-cli.
+- [ ] If the public surface changed (a command, flag or MCP tool), `api-surface.txt` was regenerated and the change is noted in CHANGELOG.md.
 - [ ] The diff is scoped to the change described — no drive-by refactors.
 
 Keep the PR description focused: what changed, why, and how you verified it. Since the founder is the sole reviewer, a tight, well-tested diff is the fastest path to merge.
@@ -213,8 +232,9 @@ channel:
 
 Before tagging, bump `Version` in `internal/version/version.go` to the exact
 version (`X.Y.Z` or `X.Y.Z-rc.N`), move the `Unreleased` CHANGELOG entries under
-it, and merge to `main`; the release workflow refuses a tag that does not match
-the constant or that is not on `main`.
+it (for a final release that section becomes the GitHub Release's notes, and
+the build fails without it), and merge to `main`; the release workflow refuses
+a tag that does not match the constant or that is not on `main`.
 
 The release workflow (`.github/workflows/release.yml`) then runs four jobs,
 and two more for a final release:
@@ -231,7 +251,9 @@ and two more for a final release:
 3. **publish**: after approval in the environment, verifies the checksums and
    signs `checksums.txt` with cosign (keyless, recorded in the Rekor
    transparency log). Nothing is rebuilt after approval.
-4. **github-release**: creates the GitHub Release from the signed files.
+4. **github-release** (on the self-hosted runners, running no repository
+   code): creates the GitHub Release from the signed files, with the notes the
+   build job took from CHANGELOG.md.
 5. **package-managers** (final releases only, never a release candidate; on
    the self-hosted runners, running no repository code): checks with plain
    bash that every URL in the Homebrew formula and the Scoop manifest is this
@@ -242,17 +264,30 @@ and two more for a final release:
    refuses unsigned ones), messages `sdo-mcp X.Y.Z`. A re-run that finds
    identical files skips with a notice.
 6. **verify-install** (GitHub-hosted, no token): `brew install
-   scrape-do/tap/sdo-mcp` on macOS and `scoop install sdo-mcp` from the bucket
-   on Windows, each checking that `sdo-mcp version` prints the version.
+   scrape-do/tap/sdo-mcp` on macOS and `scoop install scrape-do/sdo-mcp` from
+   the bucket on Windows, each checking that `sdo-mcp version` prints the
+   version.
 
 The build job makes the two files with `go run ./tools/pkgmanifests -version
 X.Y.Z -checksums dist/checksums.txt -out dist/pkgmanifests`, from
 `checksums.txt` alone and without any GitHub API access, and uploads them as the
 `pkgmanifests` artifact; smoke lints the formula (`brew style`, `ruby -c`) on
 macOS and parses the manifest on Windows. The tool's golden files in
-`tools/pkgmanifests/testdata/` are the real v0.2.0 files; after an intended
-change to the output, regenerate them with `go test ./tools/pkgmanifests
--update` and review the diff.
+`tools/pkgmanifests/testdata/` are generated from the real v0.2.0
+`checksums.txt`; after an intended change to the output, regenerate them with
+`go test ./tools/pkgmanifests -update` and review the diff.
+
+A Go module is also published by its tag — the module proxy fetches it on first
+request, and a published tag can never be moved or deleted (a bad one is
+retracted in `go.mod` and superseded by a higher tag) — so `go install
+github.com/scrape-do/sdo-mcp/cmd/sdo-mcp@vX.Y.Z` works the moment the tag
+exists, before the archives are approved.
+
+### Maintainers: release setup
+
+The `release` and `prerelease` environments have required reviewers and a
+deployment rule limited to `v*` tags. Keep them: an environment that does not
+exist is created on first use with no protection.
 
 One-time setup for jobs 5 and 6, by an org owner:
 
@@ -267,13 +302,3 @@ One-time setup for jobs 5 and 6, by an org owner:
 
 The job mints an installation token for those two repositories, limited to
 `contents: write`, which is revoked when the job ends.
-
-A Go module is also published by its tag — the module proxy fetches it on first
-request, and a published tag can never be moved or deleted (a bad one is
-retracted in `go.mod` and superseded by a higher tag) — so `go install
-github.com/scrape-do/sdo-mcp/cmd/sdo-mcp@vX.Y.Z` works the moment the tag
-exists, before the archives are approved.
-
-The `release` and `prerelease` environments have required reviewers and a
-deployment rule limited to `v*` tags. Keep them: an environment that does not
-exist is created on first use with no protection.
