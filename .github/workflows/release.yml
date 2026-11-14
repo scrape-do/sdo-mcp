@@ -240,7 +240,7 @@ jobs:
       # directory (CodeQL writes its PR diff range there); reclaim both.
       - name: Reclaim the workspace
         working-directory: ${{ github.workspace }}
-        run: docker run --rm -v "$PWD:/w" -v "$RUNNER_TEMP:/t" golang:1.27 chown -R "$(id -u):$(id -g)" /w /t
+        run: docker run --rm -v "$PWD:/w" -v "$RUNNER_TEMP:/t" busybox:1.37.0@sha256:66a6306db78bf2dbf3487f293aa8d6990d8e506fdffab9cc43fe422becf886e4 chown -R "$(id -u):$(id -g)" /w /t
       # A persistent runner keeps the workspace between runs: without this,
       # the previous release's files are still in dist/ and get uploaded too.
       - name: Start from an empty dist/
@@ -300,7 +300,7 @@ jobs:
     steps:
       - name: Reclaim the workspace
         working-directory: ${{ github.workspace }}
-        run: docker run --rm -v "$PWD:/w" -v "$RUNNER_TEMP:/t" golang:1.27 chown -R "$(id -u):$(id -g)" /w /t
+        run: docker run --rm -v "$PWD:/w" -v "$RUNNER_TEMP:/t" busybox:1.37.0@sha256:66a6306db78bf2dbf3487f293aa8d6990d8e506fdffab9cc43fe422becf886e4 chown -R "$(id -u):$(id -g)" /w /t
       - name: Start from empty directories
         run: rm -rf dist pkgmanifests
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
