@@ -8,8 +8,12 @@ import "github.com/scrape-do/sdo-mcp/internal/version"
 // repository (sdo-mcp's internal/mcp and sdo-cli's internal/mcp). Every other
 // file is kept identical apart from the module path, which sdo-mcp's CI checks.
 
-// serverVersion is reported in the handshake's serverInfo.
-const serverVersion = version.Version
+// serverName and serverVersion are reported in the handshake's serverInfo:
+// the binary that serves, and its version.
+const (
+	serverName    = "sdo-mcp"
+	serverVersion = version.Version
+)
 
 // tooLargeHint replaces the SDK's generic raise-the-limit parenthetical in a
 // response-too-large error with where this server's limit is set.

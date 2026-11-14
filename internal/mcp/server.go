@@ -17,8 +17,6 @@ import (
 	sdo "github.com/scrape-do/sdo-go"
 )
 
-const serverName = "sdo-mcp"
-
 // latestProtocolVersion is offered when the client asks for a version this
 // server does not speak; the client then decides whether to continue.
 const latestProtocolVersion = "2025-06-18"
