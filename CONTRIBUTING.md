@@ -72,7 +72,13 @@ go build ./...       # must compile
 go test ./...        # all tests must pass
 go vet ./...         # static analysis must be clean
 gofmt -l .           # must print nothing — every file is gofmt-clean
+go run ./tools/apisurface > api-surface.txt && git diff --exit-code api-surface.txt
 ```
+
+`api-surface.txt` is the server's compatibility surface: every command and
+flag, and every MCP tool and its parameters (name, type, required), one per
+line. Regenerate and commit it whenever you change any of them; the
+`api-surface` CI job fails on drift.
 
 To auto-format before committing:
 
@@ -173,6 +179,7 @@ Before you open a PR, confirm:
 - [ ] `go test ./...` passes (`go test -race ./...` if you touched concurrency).
 - [ ] `go vet ./...` is clean.
 - [ ] `gofmt -l .` prints nothing.
+- [ ] `api-surface.txt` is regenerated if a command, flag or MCP tool changed.
 - [ ] The untrusted-data fence still holds: no marker escape, no Go-identifier leak, no token leak in any result or error.
 - [ ] No telemetry, no UI, no new auth path, no new third-party network calls.
 - [ ] `go.work` / `go.work.sum` are **not** committed.

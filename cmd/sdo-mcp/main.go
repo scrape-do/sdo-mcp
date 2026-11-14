@@ -20,6 +20,7 @@ import (
 	"unicode/utf8"
 
 	sdo "github.com/scrape-do/sdo-go"
+	"github.com/scrape-do/sdo-mcp/internal/cmdline"
 	"github.com/scrape-do/sdo-mcp/internal/mcp"
 	"github.com/scrape-do/sdo-mcp/internal/version"
 )
@@ -91,16 +92,7 @@ func readTokenFile(path string) (string, error) {
 func main() { os.Exit(run(os.Args[1:], os.Stdin, os.Stdout, os.Stderr)) }
 
 func run(args []string, stdin *os.File, stdout, stderr *os.File) int {
-	fs := flag.NewFlagSet("sdo-mcp serve", flag.ContinueOnError)
-	fs.SetOutput(stderr)
-	token := fs.String("token", "", "Scrape.do API token; visible to other local users in the process list, so prefer SDO_TOKEN or --token-file")
-	tokenFile := fs.String("token-file", "", "read the Scrape.do API token from this file (owner-only permissions on Unix)")
-	insecureHTTP := fs.Bool("insecure-http", false,
-		"allow a plain-http SDO_BASE_URL / SDO_ASYNC_BASE_URL on a non-loopback host (sends the token in cleartext)")
-	clientTimeout := fs.Float64("client-timeout", 0,
-		"per-attempt timeout in seconds; 0 disables it (default: 70, or SDO_TIMEOUT)")
-	maxResponseBytes := fs.Int64("max-response-bytes", 0,
-		"ceiling for a decompressed response body, in bytes (default: 33554432, i.e. 32 MiB)")
+	fs, flags := cmdline.NewServeFlags(stderr)
 
 	usage := func() {
 		fmt.Fprintln(stderr, "sdo-mcp — the standalone Scrape.do MCP server (stdio, JSON-RPC 2.0).")
@@ -144,14 +136,14 @@ func run(args []string, stdin *os.File, stdout, stderr *os.File) int {
 
 	// Token: --token > --token-file > SDO_TOKEN. It is the sole credential and
 	// is never logged.
-	if *token != "" && *tokenFile != "" {
+	if flags.Token != "" && flags.TokenFile != "" {
 		fmt.Fprintln(stderr, "sdo-mcp: pass --token or --token-file, not both")
 		return exitUsage
 	}
-	tok := *token
-	if tok == "" && *tokenFile != "" {
+	tok := flags.Token
+	if tok == "" && flags.TokenFile != "" {
 		var err error
-		if tok, err = readTokenFile(*tokenFile); err != nil {
+		if tok, err = readTokenFile(flags.TokenFile); err != nil {
 			fmt.Fprintln(stderr, "sdo-mcp: "+sdo.RedactSecrets(err.Error()))
 			return exitAuth
 		}
@@ -168,7 +160,7 @@ func run(args []string, stdin *os.File, stdout, stderr *os.File) int {
 	// single client-identifying header (CLAUDE.md non-negotiable). sdo-mcp is a Go
 	// SDK consumer and keeps that identity rather than minting a new one.
 	var opts []sdo.Option
-	if *insecureHTTP {
+	if flags.InsecureHTTP {
 		opts = append(opts, sdo.WithAllowInsecureHTTP())
 	}
 	// --client-timeout and --max-response-bytes are applied only when explicitly
@@ -178,18 +170,18 @@ func run(args []string, stdin *os.File, stdout, stderr *os.File) int {
 	set := map[string]bool{}
 	fs.Visit(func(f *flag.Flag) { set[f.Name] = true })
 	if set["client-timeout"] {
-		if *clientTimeout < 0 {
+		if flags.ClientTimeout < 0 {
 			fmt.Fprintln(stderr, "sdo-mcp: --client-timeout must be >= 0 (0 disables the timeout)")
 			return exitUsage
 		}
-		opts = append(opts, sdo.WithTimeout(time.Duration(*clientTimeout*float64(time.Second))))
+		opts = append(opts, sdo.WithTimeout(time.Duration(flags.ClientTimeout*float64(time.Second))))
 	}
 	if set["max-response-bytes"] {
-		if *maxResponseBytes <= 0 {
+		if flags.MaxResponseBytes <= 0 {
 			fmt.Fprintln(stderr, "sdo-mcp: --max-response-bytes must be a positive number of bytes")
 			return exitUsage
 		}
-		opts = append(opts, sdo.WithMaxResponseBytes(*maxResponseBytes))
+		opts = append(opts, sdo.WithMaxResponseBytes(flags.MaxResponseBytes))
 	}
 	c, err := sdo.New(tok, opts...)
 	if err != nil {

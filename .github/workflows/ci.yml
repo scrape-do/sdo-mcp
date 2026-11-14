@@ -110,6 +110,29 @@ jobs:
           tar -xzf "$RUNNER_TEMP/actionlint.tar.gz" -C "$RUNNER_TEMP" actionlint
           "$RUNNER_TEMP/actionlint" -color
 
+  # Regenerate the command-line + MCP compat surface and fail on any drift from
+  # the committed api-surface.txt. Any add/remove/rename of a command, flag, MCP
+  # tool or tool parameter must come with a regenerated golden.
+  api-surface:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: "1.27"
+          check-latest: true
+      - name: Check the command-line + MCP surface for drift
+        run: |
+          go run ./tools/apisurface > api-surface.txt
+          if ! git diff --exit-code api-surface.txt; then
+            echo "::error::Command-line/MCP surface changed. Regenerate with 'go run ./tools/apisurface > api-surface.txt' and commit api-surface.txt." >&2
+            exit 1
+          fi
+
   # sdo-cli ships its own copies of internal/mcp and internal/explain for
   # `sdo mcp serve`. They are kept identical apart from the module path and
   # internal/mcp/branding.go, so a fix made in one repository is not silently

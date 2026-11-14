@@ -12,6 +12,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/scrape-do/sdo-mcp/internal/cmdline"
 	"github.com/scrape-do/sdo-mcp/internal/testenv"
 	"github.com/scrape-do/sdo-mcp/internal/version"
 )
@@ -99,6 +100,17 @@ func TestRun_ServeHelpExitsZero(t *testing.T) {
 	// top-level help — not a usage error.
 	if code, _, _ := runCapture(t, "serve", "--help"); code != exitOK {
 		t.Errorf("serve --help exit=%d, want %d", code, exitOK)
+	}
+}
+
+// Every command api-surface.txt lists (from cmdline.Commands) is one run
+// accepts; with --help, none of them needs a token or stdin.
+func TestRun_EveryListedCommandRuns(t *testing.T) {
+	t.Setenv("SDO_TOKEN", "")
+	for _, c := range cmdline.Commands {
+		if code, _, errOut := runCapture(t, c, "--help"); code != exitOK || strings.Contains(errOut, "unknown command") {
+			t.Errorf("%s --help: exit=%d stderr=%q", c, code, errOut)
+		}
 	}
 }
 
