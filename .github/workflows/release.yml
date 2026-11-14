@@ -255,6 +255,8 @@ jobs:
           set -euo pipefail
           cd dist
           expected=$( (awk '{print $2}' checksums.txt; echo checksums.txt; echo checksums.txt.cosign.bundle) | sort)
+          # GoReleaser's file names are plain; a name ls would mangle fails the comparison anyway.
+          # shellcheck disable=SC2012
           actual=$(ls -1 | sort)
           if [ "$expected" != "$actual" ]; then
             echo "::error::dist/ differs from checksums.txt:" >&2
@@ -387,6 +389,8 @@ jobs:
             want=$({ printf 'blob %d\0' "$(stat -c %s "$file")"; cat "$file"; } | sha1sum | cut -d' ' -f1)
             for attempt in 1 2 3; do
               [ "$attempt" -eq 1 ] || sleep $((attempt * 5))
+              # $owner, $name and $expr are GraphQL variables, not shell ones.
+              # shellcheck disable=SC2016
               if ! state=$(gh api graphql -f owner=scrape-do -f name="$repo" -f expr="main:$path" \
                 -f query='query($owner: String!, $name: String!, $expr: String!) {
                   repository(owner: $owner, name: $name) {
@@ -402,7 +406,9 @@ jobs:
                 echo "::notice::scrape-do/$repo: $path is already $PROJECT $version"
                 return 0
               fi
-              # Only fixed names, the version and base64 go into the JSON.
+              # Only fixed names, the version and base64 go into the JSON. $input
+              # is a GraphQL variable.
+              # shellcheck disable=SC2016
               printf '{"query":"%s","variables":{"input":{"branch":{"repositoryNameWithOwner":"scrape-do/%s","branchName":"main"},"message":{"headline":"%s %s"},"expectedHeadOid":"%s","fileChanges":{"additions":[{"path":"%s","contents":"%s"}]}}}}' \
                 'mutation($input: CreateCommitOnBranchInput!) { createCommitOnBranch(input: $input) { commit { url } } }' \
                 "$repo" "$PROJECT" "$version" "$head" "$path" "$(base64 -w0 "$file")" >"$RUNNER_TEMP/commit.json"
