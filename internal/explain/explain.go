@@ -13,9 +13,9 @@ import (
 )
 
 // options maps the SDK's client options to the flags and environment variables
-// the operator sets on the sdo-mcp server — --max-response-bytes, --client-timeout
-// (or SDO_TIMEOUT), --insecure-http, SDO_BASE_URL, SDO_ASYNC_BASE_URL and --token —
-// the names the model can actually act on.
+// that set them where the CLI or the server is started. sdo (whose global flags
+// also apply to `sdo mcp serve`) and sdo-mcp serve take the same names, which are
+// what the user and the model can act on.
 var options = strings.NewReplacer(
 	"WithMaxResponseBytes", "--max-response-bytes",
 	"WithAllowInsecureHTTP", "--insecure-http",
