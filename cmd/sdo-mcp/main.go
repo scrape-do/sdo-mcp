@@ -157,8 +157,8 @@ func run(args []string, stdin *os.File, stdout, stderr *os.File) int {
 	}
 
 	// The gateway sees the sdo-go SDK's own User-Agent (sdo-sdk-go/<ver>) — the
-	// single client-identifying header (CLAUDE.md non-negotiable). sdo-mcp is a Go
-	// SDK consumer and keeps that identity rather than minting a new one.
+	// single client-identifying header. sdo-mcp is a Go SDK consumer and keeps
+	// that identity rather than minting a new one.
 	var opts []sdo.Option
 	if flags.InsecureHTTP {
 		opts = append(opts, sdo.WithAllowInsecureHTTP())
