@@ -138,10 +138,11 @@ const creditNote = " Each call spends Scrape.do credits."
 
 // pluginRoutes lists the documented plugin routes, by family, for the
 // scrape_plugin description.
-const pluginRoutes = "google/search, google/search/ai-mode, google/shopping, google/shopping/product, " +
-	"google/maps/search, google/maps/place, google/maps/reviews, google/news, google/hotels, " +
-	"google/hotels/detail, google/flights, google/trends, google/trending, google/food, google/play-store, " +
-	"google/play-store/product, google/play-store/reviews, google/youtube, google/youtube/video; " +
+const pluginRoutes = "google/search, google/search/ai-mode, google/search/ai-overview, google/shopping, " +
+	"google/shopping/product, google/shopping/product/stores, google/maps/search, google/maps/place, " +
+	"google/maps/reviews, google/news, google/hotels, google/hotels/detail, google/flights, google/trends, " +
+	"google/trending, google/food, google/play-store, google/play-store/product, google/play-store/reviews, " +
+	"google/youtube, google/youtube/video; " +
 	"amazon/pdp, amazon/search, amazon/offer-listing, amazon/bestsellers, amazon/deals, amazon/seller, " +
 	"amazon (raw HTML of any Amazon url); walmart/product, walmart/search, walmart/store; " +
 	"homedepot/product, homedepot/stores; lowes/store; chatgpt/chat; gemini/chat"
