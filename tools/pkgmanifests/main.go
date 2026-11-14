@@ -283,7 +283,8 @@ func (r release) manifest() []byte {
 		m.Autoupdate.Architecture[scoop] = scoopArch{URL: next.downloadURL(next.archive(platform{"windows", goarch, "zip"}))}
 	}
 	m.Autoupdate.Hash.URL = next.downloadURL("checksums.txt")
-	// Only strings and maps of strings: Marshal cannot fail.
-	b, _ := json.MarshalIndent(m, "", "  ")
+	// Only strings and maps of strings: Marshal cannot fail. Four spaces, as
+	// Scoop's own manifests are indented.
+	b, _ := json.MarshalIndent(m, "", "    ")
 	return append(b, '\n')
 }

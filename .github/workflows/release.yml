@@ -347,7 +347,7 @@ jobs:
           awk '$1 == "url" { gsub(/"/, "", $2); u = $2 } $1 == "sha256" { gsub(/"/, "", $2); print u, $2; u = "" }' "$formula" | check_pairs 4
           # The manifest: an architecture's "url" is followed by its "hash".
           awk -F'"' '$2 == "url" { u = $4 } $2 == "hash" && NF > 4 { print u, $4; u = "" }' "$manifest" | check_pairs 2
-          grep -qxF "  \"version\": \"$version\"," "$manifest" || fail "the manifest's version is not $version"
+          grep -qxF "    \"version\": \"$version\"," "$manifest" || fail "the manifest's version is not $version"
           [ "$(grep -c '"version"' "$manifest")" -eq 1 ] || fail "the manifest has more than one version"
           echo "formula and manifest match checksums.txt of $GITHUB_REF_NAME"
       # The self-hosted runners do not ship the GitHub CLI: install a pinned,

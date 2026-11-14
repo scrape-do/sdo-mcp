@@ -62,7 +62,7 @@ func TestManifestIsOrderedJSON(t *testing.T) {
 	keys := []string{`"version"`, `"description"`, `"homepage"`, `"license"`, `"architecture"`, `"bin"`, `"checkver"`, `"autoupdate"`}
 	last := -1
 	for _, k := range keys {
-		i := bytes.Index(b, []byte("\n  "+k+":"))
+		i := bytes.Index(b, []byte("\n    "+k+":"))
 		if i <= last {
 			t.Errorf("key %s is missing or out of order", k)
 		}
