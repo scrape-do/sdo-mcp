@@ -1,7 +1,8 @@
 # SPDX-License-Identifier: Apache-2.0
 # Built by .github/workflows/release.yml with `release --skip=publish`: the
-# build job produces these files, and the approved publish job signs
-# checksums.txt with cosign and uploads everything to the GitHub Release.
+# build job produces these files, the approved publish job signs
+# checksums.txt with cosign, and the github-release job uploads everything to
+# the GitHub Release.
 #
 # Files, for version X.Y.Z (the tag without its "v"):
 #   sdo-mcp_X.Y.Z_<os>_<arch>.tar.gz   linux and darwin, amd64 and arm64
