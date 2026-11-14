@@ -1,3 +1,4 @@
+<!-- SPDX-License-Identifier: Apache-2.0 -->
 # Security Policy
 
 `sdo-mcp` (module `github.com/scrape-do/sdo-mcp`) is the standalone Scrape.do

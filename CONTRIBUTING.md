@@ -1,3 +1,4 @@
+<!-- SPDX-License-Identifier: Apache-2.0 -->
 # Contributing to sdo-mcp
 
 Thanks for your interest in improving `sdo-mcp`, the standalone Scrape.do MCP

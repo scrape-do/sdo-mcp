@@ -1,3 +1,4 @@
+<!-- SPDX-License-Identifier: Apache-2.0 -->
 # sdo-mcp
 
 The standalone **Scrape.do MCP server**: a minimal [Model Context
