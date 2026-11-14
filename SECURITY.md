@@ -39,9 +39,8 @@ Report privately through either channel — both reach the maintainer directly:
 
 A good report includes:
 
-- The server version (the `version.Version` constant, or `go list -m
-  github.com/scrape-do/sdo-mcp` in a consuming module) and your Go toolchain
-  version (`go version`).
+- The server version (`sdo-mcp version`) and, if you built it yourself, your Go
+  toolchain version (`go version`).
 - A description of the issue and its impact — especially whether it can expose,
   log, transmit, or **return to the model** the API token, alter where requests
   are sent, or cause scraped/third-party content to be treated as instructions
@@ -90,8 +89,9 @@ In scope:
 
 Out of scope:
 
-- Vulnerabilities in the Scrape.do API service itself — report those through
-  Scrape.do's main responsible-disclosure channel, not this repo.
+- Vulnerabilities in the Scrape.do API service itself — email
+  `security@scrape.do` and say the issue is in the Scrape.do service itself
+  rather than in this repository.
 - Vulnerabilities in the underlying SDK (`sdo-go`) that are not reachable
   through this server — report those against the
   [`sdo-go`](https://github.com/scrape-do/sdo-go) repository.
@@ -102,12 +102,10 @@ Out of scope:
   not cross the data/instruction boundary — a model choosing to act on fenced
   data it was told to treat as data is a client/model-policy concern, not a
   server fence failure.
-- Findings against internal build/spec tooling that is not distributed in this
-  module.
 
 ## Supply-Chain Integrity
 
-- `sdo-mcp` is built on the `sdo-go` SDK, which is tested against a cross-language conformance corpus shared by every Scrape.do SDK. Development is **TDD-first**: changes ship with tests, and CI enforces formatting, `go vet`, the race detector, a coverage floor, secret scanning, `govulncheck`, OSV scanning and a drift check against the copy of the server that ships inside the sdo CLI.
+- `sdo-mcp` is built on the `sdo-go` SDK, which is tested against a cross-language conformance corpus shared by every Scrape.do SDK. Development is **TDD-first**: changes ship with tests, and CI enforces formatting, `go vet`, the race detector, a coverage floor, secret scanning, `govulncheck`, OSV scanning, a drift check on the command and MCP surface (`api-surface.txt`), and a drift check against the copy of the server that ships inside the sdo CLI.
 - Dependencies and the SHA-pinned GitHub Actions are kept current by Dependabot, with a 7-day cooldown before a new release is proposed.
 - Releases are built from tagged commits on `main` by GoReleaser, run from every archive on a runner of its platform, and published only after approval in a protected `release` environment. For version X.Y.Z (the tag `vX.Y.Z`) a release holds:
   - `sdo-mcp_X.Y.Z_<os>_<arch>.tar.gz` for `linux` and `darwin`, and `sdo-mcp_X.Y.Z_windows_<arch>.zip`, each for `amd64` and `arm64` (e.g. `sdo-mcp_X.Y.Z_darwin_arm64.tar.gz`). Each archive holds the `sdo-mcp` binary (`sdo-mcp.exe` on Windows), `LICENSE`, `NOTICE`, `README.md`, `CHANGELOG.md` and `THIRD_PARTY_LICENSES.txt`, the license and notice texts of the Go runtime and every module linked into the binary.
@@ -133,7 +131,7 @@ Out of scope:
   grep '_darwin_arm64.tar.gz$' checksums.txt               # your platform's line: the same hash
   ```
 
-- Sibling repositories under the same governance: `sdo-cli` (the CLI, which bundles this server), `sdo-sdk-python` (PyPI `sdo-sdk`), `sdo-sdk-js` (npm `@scrape-do/sdk`), and `sdo-go` (`github.com/scrape-do/sdo-go`).
+- Sibling repositories under the same governance: [`sdo-cli`](https://github.com/scrape-do/sdo-cli) (the CLI, which bundles this server as `sdo mcp serve`), [`sdo-go`](https://github.com/scrape-do/sdo-go) (the Go SDK this server is built on), [`sdo-sdk-python`](https://github.com/scrape-do/sdo-sdk-python) and [`sdo-sdk-js`](https://github.com/scrape-do/sdo-sdk-js).
 
 ## No-Telemetry Posture
 
@@ -157,8 +155,9 @@ minors. Upgrade to the latest minor to receive security updates.
 | Any older minor        | :x:                |
 
 If you are pinned to an older minor, the remediation for a reported vulnerability
-is to upgrade to the patched latest minor (`go get -u
-github.com/scrape-do/sdo-mcp`).
+is to upgrade to the patched latest minor: `brew upgrade sdo-mcp`,
+`scoop update sdo-mcp`, or
+`go install github.com/scrape-do/sdo-mcp/cmd/sdo-mcp@latest`.
 
 ## Triage SLA
 
