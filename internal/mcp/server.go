@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 // Package mcp is a minimal Model Context Protocol server (stdio, newline-framed
-// JSON-RPC 2.0) bundled in the sdo CLI as `sdo mcp serve`. It exposes the
-// scraping surface as MCP tools, reusing the sdo Go SDK.
+// JSON-RPC 2.0), served by the standalone sdo-mcp binary and by the sdo CLI as
+// `sdo mcp serve`. It exposes the scraping surface as MCP tools, reusing the
+// sdo Go SDK.
 package mcp
 
 import (
