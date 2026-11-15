@@ -9,9 +9,10 @@
 #             that platform and runs the binary, so every published file is
 #             known to start where it is meant to run; lints the formula on
 #             macOS and parses the manifest on Windows.
-#   publish — gated by the `release` environment (required reviewers) and only
-#             for tags on commits contained in main: signs checksums.txt with
-#             cosign (keyless). Nothing is rebuilt after approval.
+#   publish — gated by the `release` or `prerelease` environment (required
+#             reviewers) and only for tags on commits contained in main: signs
+#             checksums.txt with cosign (keyless). Nothing is rebuilt after
+#             approval.
 #   github-release — creates the GitHub Release from the signed files and
 #             the release notes the build job took from CHANGELOG.md. It runs
 #             on the org's self-hosted runners: the org's IP allow list rejects
