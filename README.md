@@ -1,5 +1,5 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
-# sdo-mcp
+# sdo-mcp — the Scrape.do MCP server
 
 [![ci](https://github.com/scrape-do/sdo-mcp/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/scrape-do/sdo-mcp/actions/workflows/ci.yml) [![security](https://github.com/scrape-do/sdo-mcp/actions/workflows/security.yml/badge.svg?branch=main)](https://github.com/scrape-do/sdo-mcp/actions/workflows/security.yml) [![license](https://img.shields.io/github/license/scrape-do/sdo-mcp)](LICENSE) [![release](https://img.shields.io/github/v/release/scrape-do/sdo-mcp)](https://github.com/scrape-do/sdo-mcp/releases/latest)
 
@@ -108,7 +108,7 @@ go install github.com/scrape-do/sdo-mcp/cmd/sdo-mcp@latest   # installs a binary
 or build a clone with `go build -o sdo-mcp ./cmd/sdo-mcp`. `sdo-mcp version`
 prints the installed version.
 
-## Quick start
+## Quickstart
 
 Add the server to your MCP client's configuration (Claude Desktop, Cursor,
 Claude Code, …), with your Scrape.do token in its environment:
@@ -189,10 +189,16 @@ prints an error and exits with code 3.
   larger response fails the call rather than being materialized. Defaults to
   33554432 (32 MiB). Useful to bound how much a model-driven fetch can pull.
 
+## Responsible use
+
+You are responsible for complying with the terms of service, `robots.txt`, and
+applicable laws of any site you scrape. Third-party names are trademarks of their
+respective owners; Scrape.do is not affiliated with them.
+
 ## Documentation, support and security
 
 - API documentation: https://scrape.do/documentation
 - Releases: [GitHub Releases](https://github.com/scrape-do/sdo-mcp/releases), the [Homebrew tap](https://github.com/scrape-do/homebrew-tap) and the [Scoop bucket](https://github.com/scrape-do/scoop-bucket).
 - Bugs and feature requests for this repository: [GitHub Issues](https://github.com/scrape-do/sdo-mcp/issues). Account, billing and API questions: support@scrape.do.
 - Security issues: see [SECURITY.md](SECURITY.md). Never post an API token in an issue.
-- [CONTRIBUTING.md](CONTRIBUTING.md) · [CHANGELOG.md](CHANGELOG.md) · [Apache-2.0](LICENSE) · [NOTICE](NOTICE)
+- [CONTRIBUTING.md](CONTRIBUTING.md) · [CHANGELOG.md](CHANGELOG.md) · [MIGRATING.md](MIGRATING.md) · [Apache-2.0](LICENSE)
