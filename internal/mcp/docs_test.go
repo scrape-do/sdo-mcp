@@ -79,8 +79,9 @@ func TestPluginToolDescription(t *testing.T) {
 			}
 		}
 	}
-	for _, want := range []string{"google/search/ai-overview", "google/shopping/product/stores", "google/maps/reviews",
-		"amazon/offer-listing", "walmart/product", "homedepot/product", "lowes/store", "chatgpt/chat", "gemini/chat"} {
+	for _, want := range []string{"google/search/ai-overview", "google/goto", "google/shopping/product/stores",
+		"google/lens", "google/maps/reviews", "amazon/offer-listing", "walmart/product", "homedepot/product",
+		"lowes/store", "chatgpt/chat", "gemini/chat"} {
 		if !strings.Contains(plugin.description, want) {
 			t.Errorf("description lacks %s", want)
 		}
