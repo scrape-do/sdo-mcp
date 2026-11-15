@@ -255,8 +255,9 @@ channel:
 
 Before tagging, bump `Version` in `internal/version/version.go` to the exact
 version (`X.Y.Z` or `X.Y.Z-rc.N`), move the `Unreleased` CHANGELOG entries under
-it (for a final release that section becomes the GitHub Release's notes, and
-the build fails without it), and merge to `main`; the release workflow refuses
+it, leaving an empty `## [Unreleased]` above and updating the link definitions
+(for a final release that section becomes the GitHub Release's notes, and the
+build fails without it), and merge to `main`; the release workflow refuses
 a tag that does not match the constant or that is not on `main`.
 
 The release workflow (`.github/workflows/release.yml`) then runs four jobs,

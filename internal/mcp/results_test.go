@@ -123,7 +123,7 @@ func serverURL(t *testing.T, h http.HandlerFunc) string {
 }
 
 // The gateway's own 400 (a parameter it rejected; this is its exact reply to
-// render=mert) is a tool error carrying the gateway's message; a target's 400 the gateway
+// render=maybe) is a tool error carrying the gateway's message; a target's 400 the gateway
 // billed, like a target 404 or 410, is the page with its status. A plugin's
 // {"error","message"} envelope supplies its error's message.
 func TestGateway400IsAnErrorTargetStatusesArePages(t *testing.T) {
