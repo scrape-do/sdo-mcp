@@ -24,7 +24,8 @@ command line and the tool surface are part of the contract:
   field to a JSON result is **not**.
 - **Command line.** Removing or renaming `sdo-mcp serve` or one of its flags,
   changing a flag's type or default, or changing an exit code (`0` success,
-  `2` usage error, `3` authentication error) is a breaking change.
+  `1` server failure, `2` usage error, `3` authentication error) is a breaking
+  change.
 - **Token resolution.** The token is read from `--token`, then `--token-file`,
   then `SDO_TOKEN`, and from nowhere else. Changing that order or adding another
   credential source is a breaking change.
