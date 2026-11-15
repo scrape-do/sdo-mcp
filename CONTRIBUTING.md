@@ -181,7 +181,7 @@ This appends:
 Signed-off-by: Your Name <you@example.com>
 ```
 
-Make sure `git config user.name` and `git config user.email` are your real identity. Commits without a valid `Signed-off-by` trailer cannot be merged: CI checks every commit's subject and sign-off (`commits` job), and a pull request fails until they are fixed. To sign off a commit you already made:
+Make sure `git config user.name` and `git config user.email` are your real identity. Commits without a valid `Signed-off-by` trailer cannot be merged: CI checks every commit's subject and sign-off, and the pull request title, which becomes the squash commit's subject (`commits` job); a pull request fails until they are fixed. To sign off a commit you already made:
 
 ```sh
 git commit --amend -s --no-edit
