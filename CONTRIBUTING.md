@@ -14,7 +14,7 @@ underneath. The same server also ships inside the
 repository is the standalone binary. The scraping behaviour, error taxonomy,
 and token handling all come from `sdo-go`. The request parameters, defaults and
 observable behaviour are shared by all sdo SDKs and pinned by the conformance
-corpus (`conformance.json`), which Scrape.do maintains against
+corpus ([`conformance.json`](https://github.com/scrape-do/sdo-go/blob/main/conformance.json)), which Scrape.do maintains against
 https://scrape.do/documentation. Propose a change in an issue first; a change to
 a parameter lands in every SDK together. **Do not reimplement SDK behaviour
 here, and do not let this server drift from what the SDK already decided.**
@@ -36,17 +36,24 @@ here, and do not let this server drift from what the SDK already decided.**
 
 ### Local workspace setup (optional)
 
-A plain clone builds as it is. To develop against a local `sdo-go` checkout (an SDK change this server needs, before it is released), check the two repos out side by side and create a `go.work` that points this module at it:
+A plain clone builds as it is. To develop against a local `sdo-go` checkout (an SDK change this server needs, before it is released), use a `go.work` file in the **parent** directory. It is never committed (this repository also ignores `go.work` and `go.work.sum`, in case one is created inside it):
 
-```sh
-git clone https://github.com/scrape-do/sdo-mcp
-git clone https://github.com/scrape-do/sdo-go      # as a sibling of sdo-mcp
-cd sdo-mcp
-go work init ./ ../sdo-go
+```text
+sdo-workspace/
+├── go.work      # local only
+├── sdo-go/      # github.com/scrape-do/sdo-go
+└── sdo-mcp/     # this repository — builds the `sdo-mcp` binary
 ```
 
-`go.work` and `go.work.sum` are **local artifacts and are gitignored** — never
-commit them. `GOWORK=off go build ./...` builds against the version pinned in
+```sh
+git clone https://github.com/scrape-do/sdo-go.git
+git clone https://github.com/scrape-do/sdo-mcp.git
+go work init ./sdo-mcp ./sdo-go
+cd sdo-mcp
+```
+
+Every `go` command inside `sdo-mcp/` now builds against `../sdo-go`.
+`GOWORK=off go build ./...` builds against the version pinned in
 `go.mod` / `go.sum` instead, which is what CI and the release build do: they
 never use a workspace, so a change that needs new SDK behaviour ships only
 after that SDK version is released and pinned here.
@@ -213,11 +220,27 @@ Keep the PR description focused: what changed, why, and how you verified it. Sin
 
 - **Bugs:** open an issue with a minimal reproduction — ideally a failing Go test, plus the exact JSON-RPC request(s) sent on stdin and the flags/environment the server was started with. Include `go version`, OS, and the exact `sdo-mcp` version/commit.
 - **SDK behavior:** if the bug is in scraping, error mapping, redaction, or transport, it belongs in [`sdo-go`](https://github.com/scrape-do/sdo-go), not here. Open the issue there.
-- **Security:** do not open a public issue for vulnerabilities. Follow `SECURITY.md`.
+- **Security:** do not open a public issue for vulnerabilities. Follow [SECURITY.md](SECURITY.md).
 
 ## Questions
 
 If something here is unclear, open an issue rather than guessing. We'd rather answer a question than review a PR that took the wrong path.
+
+## CI workflows
+
+| Workflow | Runs on | What it does |
+|----------|---------|--------------|
+| `ci.yml` | every push to `main`, every pull request, and weekly | `go vet` and the race-enabled tests on Go 1.26 and 1.27 (Linux), plus macOS and Windows on 1.27, and a build of the binary; a `quality` job for `gofmt`, a check that `go install` produces a binary named `sdo-mcp`, a test run under hostile `SDO_*` settings (the suite must not depend on the environment), the 99% statement-coverage floor and actionlint; the command, flag and MCP-tool snapshot (`api-surface.txt`) must be up to date (`api-surface`); `mcp-copy-drift` compares `internal/mcp` and `internal/explain` with sdo-cli's copies (see [Shared with sdo-cli](#shared-with-sdo-cli)): a warning on a pull request, a failure on a push to `main` and in the weekly run, which exists so that drift surfaces even when this repository is quiet; CodeQL code scanning. |
+| `commits.yml` | every pull request: opened, updated, reopened, or its title or description edited | the `commits` job checks every commit's subject and sign-off and the pull request title, which becomes the squash commit's subject. A workflow of its own, so editing a pull request re-runs only this check. |
+| `security.yml` | push to `main`, pull requests, and weekly | secret scanning over the full git history (gitleaks), OSV-Scanner over `go.mod`, `govulncheck`, and an SBOM uploaded as a build artifact. OpenSSF Scorecard runs on pushes to `main` and weekly, with results in code scanning. |
+| `release.yml` | a version tag only | Six jobs, described under [Releasing](#releasing). **build** (read-only) checks the tag against the server's version, tests, builds the archives, checksums, SBOMs and third-party license notices with GoReleaser, generates the Homebrew formula and Scoop manifest, and takes the release notes from the version's CHANGELOG.md section. **smoke** unpacks every archive on a GitHub-hosted runner of its platform and runs the binary. **publish** runs only after approval in the `prerelease` or `release` environment and only for a tag on `main`: it verifies the checksums and signs `checksums.txt` with cosign (keyless); **github-release** then creates the GitHub release — a **pre-release** for `vX.Y.Z-rc.N`, a normal release for `vX.Y.Z`. For a final release only, **package-managers** commits the formula and manifest to `scrape-do/homebrew-tap` and `scrape-do/scoop-bucket`, and **verify-install** then installs the release with `brew` on macOS and `scoop` on Windows, as a user would. |
+| Dependabot | weekly | update pull requests for Go modules and the GitHub Actions, taken only after a 7-day cooldown; each one runs the checks above. |
+
+Every job runs on GitHub-hosted runners except four, which run on the org's self-hosted runners because they call the GitHub API and the org's IP allow list accepts those calls only from there: CodeQL (for same-repository events; a pull request from a fork is analysed once merged), Scorecard (pushes to `main` and the weekly run), and the release's **github-release** and **package-managers** jobs, which check out and run no repository code. Code from a fork's pull request never reaches the self-hosted runners.
+
+`go.mod` pins the `sdo-go` SDK to a released version and `go.sum` verifies it: CI and the release build fetch exactly that version from the Go module proxy.
+
+Every action is pinned to a full commit SHA and every job declares least-privilege `permissions:`. Publishing never happens outside the `scrape-do` organisation, never from a commit that is not on `main`, and never without a maintainer's approval.
 
 ## Releasing
 
@@ -289,7 +312,7 @@ The `release` and `prerelease` environments have required reviewers and a
 deployment rule limited to `v*` tags. Keep them: an environment that does not
 exist is created on first use with no protection.
 
-One-time setup for jobs 5 and 6, by an org owner:
+One-time setup for job 5, by an org owner:
 
 1. Create a GitHub App named `scrape-do-publisher`, owned by the `scrape-do`
    organisation, with no webhook and one repository permission, **Contents:
