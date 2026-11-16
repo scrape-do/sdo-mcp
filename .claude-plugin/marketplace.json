@@ -1,0 +1,17 @@
+{
+  "name": "scrape-do",
+  "owner": {
+    "name": "Scrape.do",
+    "url": "https://scrape.do"
+  },
+  "metadata": {
+    "description": "Official Scrape.do plugin for Claude: web scraping, Google, Amazon and Walmart data, and async scraping jobs."
+  },
+  "plugins": [
+    {
+      "name": "scrape-do",
+      "source": "./plugin",
+      "description": "Scrape any web page, Google Search, Amazon and Walmart data through Scrape.do."
+    }
+  ]
+}

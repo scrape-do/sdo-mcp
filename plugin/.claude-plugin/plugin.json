@@ -1,0 +1,23 @@
+{
+  "name": "scrape-do",
+  "displayName": "Scrape.do",
+  "version": "0.3.1",
+  "description": "Scrape any web page, Google Search, Amazon and Walmart data through Scrape.do's anti-bot proxy network, and run large async scraping jobs. Requires the sdo-mcp program and a Scrape.do API token.",
+  "author": {
+    "name": "Scrape.do",
+    "url": "https://scrape.do"
+  },
+  "homepage": "https://scrape.do/documentation",
+  "repository": "https://github.com/scrape-do/sdo-mcp",
+  "license": "Apache-2.0",
+  "keywords": ["web-scraping", "scraping", "proxy", "google-search", "amazon", "mcp"],
+  "userConfig": {
+    "sdo_token": {
+      "type": "string",
+      "title": "Scrape.do API token",
+      "description": "Your API token from https://app.scrape.do (Dashboard). It is stored in your system's secure credential store.",
+      "required": true,
+      "sensitive": true
+    }
+  }
+}

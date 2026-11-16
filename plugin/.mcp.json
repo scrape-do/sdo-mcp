@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "scrape-do": {
+      "command": "sdo-mcp",
+      "args": ["serve"],
+      "env": {
+        "SDO_TOKEN": "${user_config.sdo_token}"
+      }
+    }
+  }
+}

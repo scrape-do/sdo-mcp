@@ -7,6 +7,17 @@ Before 1.0, a minor version may contain breaking changes; each is marked **Break
 
 ## [Unreleased]
 
+### Added
+
+- Every tool in `tools/list` carries a `title` and MCP tool annotations
+  (`readOnlyHint`, `destructiveHint`, `openWorldHint`), as the Claude and
+  ChatGPT directories require: `scrape` and `scrape_plugin` are read-only and
+  open-world, the create tools write, and `async_job_cancel` is destructive.
+- A Claude plugin in `plugin/` (Claude Code and Cowork) that runs
+  `sdo-mcp serve` and asks for the API token at install, and a marketplace in
+  `.claude-plugin/marketplace.json`:
+  `/plugin install scrape-do --marketplace scrape-do/sdo-mcp`.
+
 ## [0.3.1] - 2026-11-15
 
 ### Changed

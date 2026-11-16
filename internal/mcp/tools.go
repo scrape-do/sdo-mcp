@@ -237,7 +237,12 @@ func init() { tools = append(tools, jobTools...) }
 func toolDefs() []map[string]any {
 	defs := make([]map[string]any, len(tools))
 	for i, t := range tools {
-		defs[i] = map[string]any{"name": t.name, "description": t.description, "inputSchema": t.schema}
+		def := map[string]any{"name": t.name, "description": t.description, "inputSchema": t.schema}
+		if m, ok := toolMetas[t.name]; ok {
+			def["title"] = m.title
+			def["annotations"] = m.annotations()
+		}
+		defs[i] = def
 	}
 	return defs
 }
